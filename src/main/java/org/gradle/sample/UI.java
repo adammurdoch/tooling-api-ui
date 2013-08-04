@@ -2,8 +2,10 @@ package org.gradle.sample;
 
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
+import org.gradle.tooling.model.ExternalDependency;
 import org.gradle.tooling.model.Task;
 import org.gradle.tooling.model.eclipse.EclipseProject;
+import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
 
 import javax.swing.*;
 import javax.swing.text.*;
@@ -75,7 +77,7 @@ public class UI {
         panel.addToolbarControl(runBuild);
         runBuild.addActionListener(new RunBuildAction());
         panel.addToolbarControl(buildModel);
-        buildModel.addActionListener(new BuildModelAction());
+        buildModel.addActionListener(new FetchEclipseModel());
         panel.addToolbarControl(runAction);
         runAction.addActionListener(new RunBuildActionAction());
         frame.setSize(1000, 800);
@@ -203,7 +205,7 @@ public class UI {
         }
     }
 
-    private class BuildModelAction extends BuildAction {
+    private class FetchEclipseModel extends BuildAction {
         @Override
         protected String getDisplayName() {
             return "fetch Eclipse model";
@@ -218,9 +220,27 @@ public class UI {
         }
 
         private void show(EclipseProject project) {
-            console.getOutput().format("%s (%s)%n", project.getName(), project);
+            PrintStream output = console.getOutput();
+            output.println("PROJECT");
+            output.format("%s (%s)%n", project.getName(), project);
+            output.format("build script: %s%n", project.getGradleProject().getBuildScript().getSourceFile());
+            output.println();
+
+            output.println("SOURCE DIRECTORIES");
+            for (EclipseSourceDirectory sourceDirectory : project.getSourceDirectories()) {
+                output.format("%s -> %s%n", sourceDirectory.getPath(), sourceDirectory.getDirectory());
+            }
+            output.println();
+
+            output.println("CLASSPATH");
+            for (ExternalDependency dependency : project.getClasspath()) {
+                output.format("%s -> %s%n", dependency.getGradleModuleVersion(), dependency.getFile());
+            }
+            output.println();
+
+            output.println("TASKS");
             for (Task task : project.getGradleProject().getTasks()) {
-                console.getOutput().format("    %s (%s)%n", task.getName(), task);
+                output.format("%s (%s)%n", task.getName(), task);
             }
             for (EclipseProject childProject : project.getChildren()) {
                 show(childProject);
