@@ -29,13 +29,21 @@ public class UI {
     private final JTextField commandLineArgs;
     private final JCheckBox embedded;
     private final ConsolePanel console;
+    private final ConsolePanel log;
+    private final PrintStream originalStdOut;
+    private final PrintStream originalStdErr;
 
     public UI() {
+        originalStdOut = System.out;
+        originalStdErr = System.err;
         buildModel = new JButton("Eclipse model");
         runAction = new JButton("Client action");
         runBuild = new JButton("Build");
         panel = new MainPanel();
         console = panel.getConsole();
+        log = panel.getLog();
+        System.setOut(log.getOutput());
+        System.setErr(log.getError());
         projectDirSelector = new PathControl();
         useDistribution = new JRadioButton("Use distribution");
         installation = new PathControl();
@@ -62,28 +70,36 @@ public class UI {
         distSelector.add(useDistribution);
         useDistribution.setSelected(true);
         panel.addControl(embedded);
-        panel.addControl("Command-line arguments", commandLineArgs);
-        buildModel.addActionListener(new BuildModelAction());
-        panel.addControl(buildModel);
+        panel.addToolbarControl("Command-line arguments", commandLineArgs);
+        commandLineArgs.addActionListener(new RunBuildAction());
+        panel.addToolbarControl(runBuild);
         runBuild.addActionListener(new RunBuildAction());
-        panel.addControl(runBuild);
+        panel.addToolbarControl(buildModel);
+        buildModel.addActionListener(new BuildModelAction());
+        panel.addToolbarControl(runAction);
         runAction.addActionListener(new RunBuildActionAction());
-        panel.addControl(runAction);
         frame.setSize(1000, 800);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
-    private void onStartOperation() {
+    private void onStartOperation(String displayName) {
         buildModel.setEnabled(false);
         runBuild.setEnabled(false);
         runAction.setEnabled(false);
         console.clearOutput();
+        panel.onProgress("");
+        log.getOutput().println("================");
+        log.getOutput().print("Starting ");
+        log.getOutput().println(displayName);
+        log.getOutput().println("================");
     }
 
     private void onFinishOperation(long timeMillis) {
         console.getOutput().flush();
         console.getError().flush();
+        log.getOutput().flush();
+        log.getError().flush();
         panel.onProgress("Finished (" + timeMillis/1000 + " seconds)");
         buildModel.setEnabled(true);
         runBuild.setEnabled(true);
@@ -92,7 +108,7 @@ public class UI {
 
     private abstract class BuildAction implements ActionListener {
         public void actionPerformed(ActionEvent actionEvent) {
-            onStartOperation();
+            onStartOperation(getDisplayName());
             final File projectDir = projectDirSelector.getFile();
             final File distribution = useDistribution.isSelected() ? installation.getFile() : null;
             final boolean isEmbedded = embedded.isSelected();
@@ -120,8 +136,8 @@ public class UI {
                             connection.close();
                         }
                     } catch (Throwable t) {
-                        console.getError().println("FAILURE:");
-                        t.printStackTrace(console.getError());
+                        log.getError().println("FAILED WITH EXCEPTION");
+                        t.printStackTrace(log.getError());
                     } finally {
                         final long endTime = System.currentTimeMillis();
                         SwingUtilities.invokeLater(new Runnable() {
@@ -134,11 +150,14 @@ public class UI {
             }.start();
         }
 
+        protected abstract String getDisplayName();
+
         protected abstract void run(ProjectConnection connection);
 
         protected void setup(LongRunningOperation operation) {
             operation.addProgressListener(new ProgressListener() {
                 public void statusChanged(ProgressEvent event) {
+                    log.getOutput().println("[progress: " + event.getDescription() + "]");
                     panel.onProgress(event.getDescription());
                 }
             });
@@ -152,6 +171,11 @@ public class UI {
 
     private class RunBuildAction extends BuildAction {
         @Override
+        protected String getDisplayName() {
+            return "build using " + commandLineArgs.getText();
+        }
+
+        @Override
         protected void run(ProjectConnection connection) {
             BuildLauncher launcher = connection.newBuild();
             setup(launcher);
@@ -160,6 +184,11 @@ public class UI {
     }
 
     private class RunBuildActionAction extends BuildAction {
+        @Override
+        protected String getDisplayName() {
+            return "client action";
+        }
+
         @Override
         protected void run(ProjectConnection connection) {
             BuildActionExecuter<String> executer = connection.action(new org.gradle.tooling.BuildAction<String>() {
@@ -175,6 +204,11 @@ public class UI {
     }
 
     private class BuildModelAction extends BuildAction {
+        @Override
+        protected String getDisplayName() {
+            return "fetch Eclipse model";
+        }
+
         @Override
         protected void run(ProjectConnection connection) {
             ModelBuilder<EclipseProject> model = connection.model(EclipseProject.class);
@@ -200,7 +234,7 @@ class PathControl extends JPanel {
 
     PathControl() {
         path = new JTextField();
-        path.setColumns(80);
+        path.setColumns(30);
         add(path);
         JButton select = new JButton("...");
         select.addActionListener(new SelectFileAction());
@@ -234,36 +268,62 @@ class PathControl extends JPanel {
 }
 
 class MainPanel extends JPanel {
-    private final JPanel controls;
+    private final JPanel settings;
+    private final JPanel toolbar;
     private final JLabel progress;
     private final ConsolePanel console;
+    private final ConsolePanel log;
+    private final JTabbedPane tabs;
 
     MainPanel() {
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         setLayout(new BorderLayout());
-        controls = new JPanel();
-        controls.setLayout(new BoxLayout(controls, BoxLayout.Y_AXIS));
-        add(controls, BorderLayout.NORTH);
+
+        toolbar = new JPanel();
+        toolbar.setLayout(new BoxLayout(toolbar, BoxLayout.X_AXIS));
+        add(toolbar, BorderLayout.NORTH);
+
+        tabs = new JTabbedPane();
+        add(tabs, BorderLayout.CENTER);
 
         console = new ConsolePanel();
-        add(new JScrollPane(console), BorderLayout.CENTER);
+        tabs.addTab("Console", new JScrollPane(console));
+
+        log = new ConsolePanel();
+        tabs.addTab("Log", new JScrollPane(log));
+
+        settings = new JPanel();
+        settings.setLayout(new BoxLayout(settings, BoxLayout.Y_AXIS));
+        tabs.addTab("Settings", settings);
 
         progress = new JLabel();
         add(progress, BorderLayout.SOUTH);
     }
 
+    void addToolbarControl(AbstractButton button) {
+        toolbar.add(button);
+    }
+
+    void addToolbarControl(String title, JComponent component) {
+        toolbar.add(component);
+    }
+
     void addControl(AbstractButton button) {
-        controls.add(button);
+        settings.add(button);
     }
 
     void addControl(String title, JComponent comp) {
-        controls.add(new JLabel(title));
-        controls.add(comp);
+        settings.add(new JLabel(title));
+        settings.add(comp);
     }
 
     public ConsolePanel getConsole() {
         return console;
+    }
+
+    public ConsolePanel getLog() {
+        return log;
     }
 
     public void onProgress(final String text) {
