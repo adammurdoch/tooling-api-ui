@@ -1,0 +1,19 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'application'
+
+def toolingApiVersion='latest.integration'
+
+repositories {
+    mavenRepo url: '../../gradle/build/repo'
+    mavenRepo url: 'http://repo.gradle.org/gradle/repo'
+    mavenCentral()
+}
+
+dependencies {
+    compile "org.gradle:gradle-tooling-api:${toolingApiVersion}"
+    runtime 'org.slf4j:slf4j-simple:1.6.1'
+}
+
+mainClassName = 'org.gradle.sample.UI'
+
