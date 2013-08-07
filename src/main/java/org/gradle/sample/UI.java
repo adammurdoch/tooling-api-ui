@@ -193,15 +193,18 @@ public class UI {
 
         @Override
         protected void run(ProjectConnection connection) {
-            BuildActionExecuter<String> executer = connection.action(new org.gradle.tooling.BuildAction<String>() {
-                @Override
-                public String execute(BuildController controller) {
-                    return "result";
-                }
-            });
+            BuildActionExecuter<String> executer = connection.action(new ToolingBuildAction());
             setup(executer);
             String result = executer.run();
             console.getOutput().format("result: %s%n", result);
+        }
+
+    }
+
+    private static class ToolingBuildAction implements org.gradle.tooling.BuildAction<String> {
+        @Override
+        public String execute(BuildController controller) {
+            return "running in build process!";
         }
     }
 
