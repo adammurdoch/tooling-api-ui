@@ -3,18 +3,22 @@ package org.gradle.sample;
 import org.gradle.gui.ConsolePanel;
 import org.gradle.gui.MainPanel;
 import org.gradle.gui.PathControl;
+import org.gradle.gui.UIContext;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
 import org.gradle.tooling.model.ExternalDependency;
+import org.gradle.tooling.model.GradleProject;
 import org.gradle.tooling.model.Task;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
+import org.gradle.tooling.model.idea.IdeaProject;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.PrintStream;
+import java.io.Serializable;
 
 public class UI {
 
@@ -53,7 +57,7 @@ public class UI {
     public static void main(String[] args) {
         new UI().go();
     }
-    
+
     void go() {
         JFrame frame = new JFrame("Tooling API Test UI");
         frame.setContentPane(panel);
@@ -94,12 +98,12 @@ public class UI {
         log.getOutput().println("================");
     }
 
-    private void onFinishOperation(long timeMillis) {
+    private void onFinishOperation(long timeMillis, Throwable failure) {
         console.getOutput().flush();
         console.getError().flush();
         log.getOutput().flush();
         log.getError().flush();
-        panel.onProgress("Finished (" + timeMillis/1000 + " seconds)");
+        panel.onProgress((failure == null ? "Finished" : "Failed") + " (" + timeMillis / 1000 + " seconds)");
         buildModel.setEnabled(true);
         runBuild.setEnabled(true);
         runAction.setEnabled(true);
@@ -111,11 +115,29 @@ public class UI {
             final File projectDir = projectDirSelector.getFile();
             final File distribution = useDistribution.isSelected() ? installation.getFile() : null;
             final boolean isEmbedded = embedded.isSelected();
+            final String commandLine = commandLineArgs.getText().trim();
+            final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput()) {
+                @Override
+                public void setup(LongRunningOperation operation) {
+                    operation.addProgressListener(new ProgressListener() {
+                        public void statusChanged(ProgressEvent event) {
+                            log.getOutput().println("[progress: " + event.getDescription() + "]");
+                            panel.onProgress(event.getDescription());
+                        }
+                    });
+                    operation.setStandardOutput(console.getOutput());
+                    operation.setStandardError(console.getError());
+                    if (!commandLine.isEmpty()) {
+                        operation.withArguments(commandLine.split("\\s+"));
+                    }
+                }
+            };
             panel.onProgress("building for project dir: " + projectDir);
             new Thread() {
                 @Override
                 public void run() {
                     final long startTime = System.currentTimeMillis();
+                    Throwable failure = null;
                     try {
                         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
                         if (distribution != null) {
@@ -130,18 +152,20 @@ public class UI {
                         }
                         ProjectConnection connection = connector.forProjectDirectory(projectDir).connect();
                         try {
-                            BuildAction.this.run(connection);
+                            BuildAction.this.run(connection, uiContext);
                         } finally {
                             connection.close();
                         }
                     } catch (Throwable t) {
                         log.getError().println("FAILED WITH EXCEPTION");
                         t.printStackTrace(log.getError());
+                        failure = t;
                     } finally {
                         final long endTime = System.currentTimeMillis();
+                        final Throwable finalFailure = failure;
                         SwingUtilities.invokeLater(new Runnable() {
                             public void run() {
-                                onFinishOperation(endTime - startTime);
+                                onFinishOperation(endTime - startTime, finalFailure);
                             }
                         });
                     }
@@ -151,21 +175,7 @@ public class UI {
 
         protected abstract String getDisplayName();
 
-        protected abstract void run(ProjectConnection connection);
-
-        protected void setup(LongRunningOperation operation) {
-            operation.addProgressListener(new ProgressListener() {
-                public void statusChanged(ProgressEvent event) {
-                    log.getOutput().println("[progress: " + event.getDescription() + "]");
-                    panel.onProgress(event.getDescription());
-                }
-            });
-            operation.setStandardOutput(console.getOutput());
-            operation.setStandardError(console.getError());
-            if (!commandLineArgs.getText().trim().isEmpty()) {
-                operation.withArguments(commandLineArgs.getText().split("\\s+"));
-            }
-        }
+        protected abstract void run(ProjectConnection connection, UIContext uiContext);
     }
 
     private class RunBuildAction extends BuildAction {
@@ -175,9 +185,9 @@ public class UI {
         }
 
         @Override
-        protected void run(ProjectConnection connection) {
+        protected void run(ProjectConnection connection, UIContext uiContext) {
             BuildLauncher launcher = connection.newBuild();
-            setup(launcher);
+            uiContext.setup(launcher);
             launcher.run();
         }
     }
@@ -189,19 +199,50 @@ public class UI {
         }
 
         @Override
-        protected void run(ProjectConnection connection) {
-            BuildActionExecuter<String> executer = connection.action(new ToolingBuildAction());
-            setup(executer);
-            String result = executer.run();
-            console.getOutput().format("result: %s%n", result);
-        }
+        protected void run(ProjectConnection connection, UIContext uiContext) {
+            BuildActionExecuter<MultiModel> executer = connection.action(new ToolingBuildAction());
+            uiContext.setup(executer);
+            MultiModel result = executer.run();
 
+            PrintStream stdOut = uiContext.getConsoleStdOut();
+
+            GradleProject gradleProject = result.gradleProject;
+            stdOut.println("== GRADLE ==");
+            stdOut.format("path: %s%n", gradleProject.getPath());
+            stdOut.format("name: %s%n", gradleProject.getName());
+            stdOut.format("build script: %s%n", gradleProject.getBuildScript().getSourceFile());
+
+            EclipseProject eclipseProject = result.eclipseProject;
+            stdOut.println();
+            stdOut.println("== ECLIPSE ==");
+            stdOut.format("name: %s%n", eclipseProject.getName());
+            stdOut.format("project dir: %s%n", eclipseProject.getProjectDirectory());
+
+            IdeaProject ideaProject = result.ideaProject;
+            stdOut.println();
+            stdOut.println("== IDEA ==");
+            stdOut.format("name: %s%n", ideaProject.getName());
+            stdOut.format("jdk: %s%n", ideaProject.getJdkName());
+            stdOut.format("Java language: %s%n", ideaProject.getLanguageLevel().getLevel());
+            stdOut.format("output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getOutputDir());
+            stdOut.format("test output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getTestOutputDir());
+        }
     }
 
-    private static class ToolingBuildAction implements org.gradle.tooling.BuildAction<String> {
+    private static class MultiModel implements Serializable {
+        GradleProject gradleProject;
+        EclipseProject eclipseProject;
+        IdeaProject ideaProject;
+    }
+
+    private static class ToolingBuildAction implements org.gradle.tooling.BuildAction<MultiModel> {
         @Override
-        public String execute(BuildController controller) {
-            return "running in build process!";
+        public MultiModel execute(BuildController controller) {
+            MultiModel result = new MultiModel();
+            result.gradleProject = controller.getModel(GradleProject.class);
+            result.eclipseProject = controller.getModel(EclipseProject.class);
+            result.ideaProject = controller.getModel(IdeaProject.class);
+            return result;
         }
     }
 
@@ -212,15 +253,14 @@ public class UI {
         }
 
         @Override
-        protected void run(ProjectConnection connection) {
+        protected void run(ProjectConnection connection, UIContext uiContext) {
             ModelBuilder<EclipseProject> model = connection.model(EclipseProject.class);
-            setup(model);
+            uiContext.setup(model);
             EclipseProject project = model.get();
-            show(project);
+            show(project, uiContext.getConsoleStdOut());
         }
 
-        private void show(EclipseProject project) {
-            PrintStream output = console.getOutput();
+        private void show(EclipseProject project, PrintStream output) {
             output.println("PROJECT");
             output.format("%s (%s)%n", project.getName(), project);
             output.format("build script: %s%n", project.getGradleProject().getBuildScript().getSourceFile());
@@ -242,8 +282,10 @@ public class UI {
             for (Task task : project.getGradleProject().getTasks()) {
                 output.format("%s (%s)%n", task.getName(), task);
             }
+            output.println();
+
             for (EclipseProject childProject : project.getChildren()) {
-                show(childProject);
+                show(childProject, output);
             }
         }
     }
