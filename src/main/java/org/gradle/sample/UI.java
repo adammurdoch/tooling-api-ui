@@ -6,9 +6,7 @@ import org.gradle.gui.PathControl;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
-import org.gradle.tooling.model.ExternalDependency;
-import org.gradle.tooling.model.GradleProject;
-import org.gradle.tooling.model.Task;
+import org.gradle.tooling.model.*;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
 import org.gradle.tooling.model.idea.IdeaProject;
@@ -261,6 +259,7 @@ public class UI {
         }
 
         private void show(EclipseProject project, PrintStream output) {
+            output.println();
             output.println("PROJECT");
             output.format("%s (%s)%n", project.getName(), project);
             output.format("build script: %s%n", project.getGradleProject().getBuildScript().getSourceFile());
