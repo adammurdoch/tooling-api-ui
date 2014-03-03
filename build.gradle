@@ -5,8 +5,8 @@ apply plugin: 'application'
 def toolingApiVersion='latest.integration'
 
 repositories {
-    mavenRepo url: '../../gradle/build/repo'
-    mavenRepo url: 'http://repo.gradle.org/gradle/repo'
+    maven { url '../../gradle/build/repo' }
+    maven { url 'http://repo.gradle.org/gradle/repo' }
     mavenCentral()
 }
 
