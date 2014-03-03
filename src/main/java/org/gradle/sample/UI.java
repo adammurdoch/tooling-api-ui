@@ -6,19 +6,12 @@ import org.gradle.gui.PathControl;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
-import org.gradle.tooling.model.ExternalDependency;
-import org.gradle.tooling.model.GradleProject;
-import org.gradle.tooling.model.Task;
-import org.gradle.tooling.model.eclipse.EclipseProject;
-import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
-import org.gradle.tooling.model.idea.IdeaProject;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.PrintStream;
-import java.io.Serializable;
 import java.util.Arrays;
 
 public class UI {
@@ -110,7 +103,7 @@ public class UI {
         runAction.setEnabled(true);
     }
 
-    private interface ToolingOperation {
+    public interface ToolingOperation {
         String getDisplayName(UIContext uiContext);
 
         /**
@@ -187,119 +180,6 @@ public class UI {
                     }
                 }
             }.start();
-        }
-    }
-
-    private static class RunBuildAction implements ToolingOperation {
-        @Override
-        public String getDisplayName(UIContext uiContext) {
-            return "build using " + uiContext.getCommandLineArgs();
-        }
-
-        @Override
-        public void run(ProjectConnection connection, UIContext uiContext) {
-            BuildLauncher launcher = connection.newBuild();
-            uiContext.setup(launcher);
-            launcher.run();
-        }
-    }
-
-    private static class RunBuildActionAction implements ToolingOperation {
-        @Override
-        public String getDisplayName(UIContext uiContext) {
-            return "client action";
-        }
-
-        @Override
-        public void run(ProjectConnection connection, UIContext uiContext) {
-            BuildActionExecuter<MultiModel> executer = connection.action(new ToolingBuildAction());
-            uiContext.setup(executer);
-            MultiModel result = executer.run();
-
-            PrintStream stdOut = uiContext.getConsoleStdOut();
-
-            GradleProject gradleProject = result.gradleProject;
-            stdOut.println("== GRADLE ==");
-            stdOut.format("path: %s%n", gradleProject.getPath());
-            stdOut.format("name: %s%n", gradleProject.getName());
-            stdOut.format("build script: %s%n", gradleProject.getBuildScript().getSourceFile());
-
-            EclipseProject eclipseProject = result.eclipseProject;
-            stdOut.println();
-            stdOut.println("== ECLIPSE ==");
-            stdOut.format("name: %s%n", eclipseProject.getName());
-            stdOut.format("project dir: %s%n", eclipseProject.getProjectDirectory());
-
-            IdeaProject ideaProject = result.ideaProject;
-            stdOut.println();
-            stdOut.println("== IDEA ==");
-            stdOut.format("name: %s%n", ideaProject.getName());
-            stdOut.format("jdk: %s%n", ideaProject.getJdkName());
-            stdOut.format("Java language: %s%n", ideaProject.getLanguageLevel().getLevel());
-            stdOut.format("output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getOutputDir());
-            stdOut.format("test output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getTestOutputDir());
-        }
-    }
-
-    private static class MultiModel implements Serializable {
-        GradleProject gradleProject;
-        EclipseProject eclipseProject;
-        IdeaProject ideaProject;
-    }
-
-    private static class ToolingBuildAction implements org.gradle.tooling.BuildAction<MultiModel> {
-        @Override
-        public MultiModel execute(BuildController controller) {
-            MultiModel result = new MultiModel();
-            result.gradleProject = controller.getModel(GradleProject.class);
-            result.eclipseProject = controller.getModel(EclipseProject.class);
-            result.ideaProject = controller.getModel(IdeaProject.class);
-            return result;
-        }
-    }
-
-    private static class FetchEclipseModel implements ToolingOperation {
-        @Override
-        public String getDisplayName(UIContext uiContext) {
-            return "fetch Eclipse model";
-        }
-
-        @Override
-        public void run(ProjectConnection connection, UIContext uiContext) {
-            ModelBuilder<EclipseProject> model = connection.model(EclipseProject.class);
-            uiContext.setup(model);
-            EclipseProject project = model.get();
-            show(project, uiContext.getConsoleStdOut());
-        }
-
-        private void show(EclipseProject project, PrintStream output) {
-            output.println();
-            output.println("PROJECT");
-            output.format("%s (%s)%n", project.getName(), project);
-            output.format("build script: %s%n", project.getGradleProject().getBuildScript().getSourceFile());
-            output.println();
-
-            output.println("SOURCE DIRECTORIES");
-            for (EclipseSourceDirectory sourceDirectory : project.getSourceDirectories()) {
-                output.format("%s -> %s%n", sourceDirectory.getPath(), sourceDirectory.getDirectory());
-            }
-            output.println();
-
-            output.println("CLASSPATH");
-            for (ExternalDependency dependency : project.getClasspath()) {
-                output.format("%s -> %s%n", dependency.getGradleModuleVersion(), dependency.getFile());
-            }
-            output.println();
-
-            output.println("TASKS");
-            for (Task task : project.getGradleProject().getTasks()) {
-                output.format("%s (%s)%n", task.getName(), task);
-            }
-            output.println();
-
-            for (EclipseProject childProject : project.getChildren()) {
-                show(childProject, output);
-            }
         }
     }
 }
