@@ -6,7 +6,9 @@ import org.gradle.gui.PathControl;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
-import org.gradle.tooling.model.*;
+import org.gradle.tooling.model.ExternalDependency;
+import org.gradle.tooling.model.GradleProject;
+import org.gradle.tooling.model.Task;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
 import org.gradle.tooling.model.idea.IdeaProject;
@@ -17,6 +19,7 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.PrintStream;
 import java.io.Serializable;
+import java.util.Arrays;
 
 public class UI {
 
@@ -72,13 +75,13 @@ public class UI {
         useDistribution.setSelected(true);
         panel.addControl(embedded);
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
-        commandLineArgs.addActionListener(new RunBuildAction());
+        commandLineArgs.addActionListener(new BuildAction(new RunBuildAction()));
         panel.addToolbarControl(runBuild);
-        runBuild.addActionListener(new RunBuildAction());
+        runBuild.addActionListener(new BuildAction(new RunBuildAction()));
         panel.addToolbarControl(buildModel);
-        buildModel.addActionListener(new FetchEclipseModel());
+        buildModel.addActionListener(new BuildAction(new FetchEclipseModel()));
         panel.addToolbarControl(runAction);
-        runAction.addActionListener(new RunBuildActionAction());
+        runAction.addActionListener(new BuildAction(new RunBuildActionAction()));
         frame.setSize(1000, 800);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -107,14 +110,28 @@ public class UI {
         runAction.setEnabled(true);
     }
 
-    private abstract class BuildAction implements ActionListener {
+    private interface ToolingOperation {
+        String getDisplayName(UIContext uiContext);
+
+        /**
+         * Executes this operation. Called from a non-UI thread.
+         */
+        void run(ProjectConnection connection, UIContext uiContext);
+    }
+
+    private class BuildAction implements ActionListener {
+        private final ToolingOperation operation;
+
+        protected BuildAction(ToolingOperation operation) {
+            this.operation = operation;
+        }
+
         public void actionPerformed(ActionEvent actionEvent) {
-            onStartOperation(getDisplayName());
             final File projectDir = projectDirSelector.getFile();
             final File distribution = useDistribution.isSelected() ? installation.getFile() : null;
             final boolean isEmbedded = embedded.isSelected();
-            final String commandLine = commandLineArgs.getText().trim();
-            final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput()) {
+            final String[] commandLine = commandLineArgs.getText().trim().split("\\s+");
+            final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(), Arrays.asList(commandLine)) {
                 @Override
                 public void setup(LongRunningOperation operation) {
                     operation.addProgressListener(new ProgressListener() {
@@ -125,11 +142,12 @@ public class UI {
                     });
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());
-                    if (!commandLine.isEmpty()) {
-                        operation.withArguments(commandLine.split("\\s+"));
+                    if (commandLine.length > 0) {
+                        operation.withArguments(commandLine);
                     }
                 }
             };
+            onStartOperation(operation.getDisplayName(uiContext));
             panel.onProgress("building for project dir: " + projectDir);
             new Thread() {
                 @Override
@@ -150,7 +168,7 @@ public class UI {
                         }
                         ProjectConnection connection = connector.forProjectDirectory(projectDir).connect();
                         try {
-                            BuildAction.this.run(connection, uiContext);
+                            operation.run(connection, uiContext);
                         } finally {
                             connection.close();
                         }
@@ -170,34 +188,30 @@ public class UI {
                 }
             }.start();
         }
-
-        protected abstract String getDisplayName();
-
-        protected abstract void run(ProjectConnection connection, UIContext uiContext);
     }
 
-    private class RunBuildAction extends BuildAction {
+    private static class RunBuildAction implements ToolingOperation {
         @Override
-        protected String getDisplayName() {
-            return "build using " + commandLineArgs.getText();
+        public String getDisplayName(UIContext uiContext) {
+            return "build using " + uiContext.getCommandLineArgs();
         }
 
         @Override
-        protected void run(ProjectConnection connection, UIContext uiContext) {
+        public void run(ProjectConnection connection, UIContext uiContext) {
             BuildLauncher launcher = connection.newBuild();
             uiContext.setup(launcher);
             launcher.run();
         }
     }
 
-    private class RunBuildActionAction extends BuildAction {
+    private static class RunBuildActionAction implements ToolingOperation {
         @Override
-        protected String getDisplayName() {
+        public String getDisplayName(UIContext uiContext) {
             return "client action";
         }
 
         @Override
-        protected void run(ProjectConnection connection, UIContext uiContext) {
+        public void run(ProjectConnection connection, UIContext uiContext) {
             BuildActionExecuter<MultiModel> executer = connection.action(new ToolingBuildAction());
             uiContext.setup(executer);
             MultiModel result = executer.run();
@@ -244,14 +258,14 @@ public class UI {
         }
     }
 
-    private class FetchEclipseModel extends BuildAction {
+    private static class FetchEclipseModel implements ToolingOperation {
         @Override
-        protected String getDisplayName() {
+        public String getDisplayName(UIContext uiContext) {
             return "fetch Eclipse model";
         }
 
         @Override
-        protected void run(ProjectConnection connection, UIContext uiContext) {
+        public void run(ProjectConnection connection, UIContext uiContext) {
             ModelBuilder<EclipseProject> model = connection.model(EclipseProject.class);
             uiContext.setup(model);
             EclipseProject project = model.get();
