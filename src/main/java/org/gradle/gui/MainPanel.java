@@ -37,6 +37,10 @@ public class MainPanel extends JPanel {
         add(progress, BorderLayout.SOUTH);
     }
 
+    public void addTab(String title, JComponent component) {
+        tabs.addTab(title, component);
+    }
+
     public void addToolbarControl(AbstractButton button) {
         toolbar.add(button);
     }

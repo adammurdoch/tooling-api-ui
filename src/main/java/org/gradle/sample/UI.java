@@ -6,8 +6,13 @@ import org.gradle.gui.PathControl;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
+import org.gradle.tooling.model.gradle.BasicGradleProject;
+import org.gradle.tooling.model.gradle.GradleBuild;
 
 import javax.swing.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.MutableTreeNode;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
@@ -19,6 +24,7 @@ public class UI {
     private final JButton buildModel;
     private final JButton runBuild;
     private final JButton runAction;
+    private final JButton projects;
     private final MainPanel panel;
     private final PathControl projectDirSelector;
     private final JRadioButton useDistribution;
@@ -36,6 +42,7 @@ public class UI {
         buildModel = new JButton("Eclipse model");
         runAction = new JButton("Client action");
         runBuild = new JButton("Build");
+        projects = new JButton("Projects");
         panel = new MainPanel();
         console = panel.getConsole();
         log = panel.getLog();
@@ -68,13 +75,17 @@ public class UI {
         useDistribution.setSelected(true);
         panel.addControl(embedded);
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
-        commandLineArgs.addActionListener(new BuildAction(new RunBuildAction()));
+        commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
         panel.addToolbarControl(runBuild);
-        runBuild.addActionListener(new BuildAction(new RunBuildAction()));
+        runBuild.addActionListener(new BuildAction<>(new RunBuildAction()));
+        panel.addToolbarControl(projects);
+        JTree projects = new JTree();
+        panel.addTab("Projects", projects);
+        this.projects.addActionListener(new BuildAction<>(new GetBuildModel(), new ProjectTree(projects)));
         panel.addToolbarControl(buildModel);
-        buildModel.addActionListener(new BuildAction(new FetchEclipseModel()));
+        buildModel.addActionListener(new BuildAction<>(new FetchEclipseModel()));
         panel.addToolbarControl(runAction);
-        runAction.addActionListener(new BuildAction(new RunBuildActionAction()));
+        runAction.addActionListener(new BuildAction<>(new RunBuildActionAction()));
         frame.setSize(1000, 800);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -84,6 +95,7 @@ public class UI {
         buildModel.setEnabled(false);
         runBuild.setEnabled(false);
         runAction.setEnabled(false);
+        projects.setEnabled(false);
         console.clearOutput();
         panel.onProgress("");
         log.getOutput().println("================");
@@ -101,22 +113,89 @@ public class UI {
         buildModel.setEnabled(true);
         runBuild.setEnabled(true);
         runAction.setEnabled(true);
+        projects.setEnabled(true);
     }
 
-    public interface ToolingOperation {
+    public interface ToolingOperation<T> {
         String getDisplayName(UIContext uiContext);
 
         /**
-         * Executes this operation. Called from a non-UI thread.
+         * Executes this operation and returns some result. Called from a non-UI thread.
          */
-        void run(ProjectConnection connection, UIContext uiContext);
+        T run(ProjectConnection connection, UIContext uiContext);
     }
 
-    private class BuildAction implements ActionListener {
-        private final ToolingOperation operation;
+    public interface UIOperation<T> {
+        void failed();
 
-        protected BuildAction(ToolingOperation operation) {
+        /**
+         * Updates the UI. Called from the AWT event thread.
+         */
+        void update(T result);
+    }
+
+    private static class GetBuildModel implements ToolingOperation<GradleBuild> {
+        @Override
+        public String getDisplayName(UIContext uiContext) {
+            return "fetch projects";
+        }
+
+        @Override
+        public GradleBuild run(ProjectConnection connection, UIContext uiContext) {
+            ModelBuilder<GradleBuild> builder = connection.model(GradleBuild.class);
+            uiContext.setup(builder);
+            return builder.get();
+        }
+    }
+
+    private static class ProjectTree implements UIOperation<GradleBuild> {
+        JTree tree;
+
+        private ProjectTree(JTree tree) {
+            this.tree = tree;
+            tree.setModel(new DefaultTreeModel(new DefaultMutableTreeNode()));
+        }
+
+        @Override
+        public void failed() {
+            tree.setModel(new DefaultTreeModel(new DefaultMutableTreeNode("FAILED")));
+        }
+
+        @Override
+        public void update(GradleBuild gradleBuild) {
+            tree.setModel(new DefaultTreeModel(toNode(gradleBuild.getRootProject())));
+        }
+
+        private MutableTreeNode toNode(BasicGradleProject project) {
+            DefaultMutableTreeNode node = new DefaultMutableTreeNode();
+            node.setUserObject(String.format("Project %s", project.getName()));
+            for (BasicGradleProject childProject : project.getChildren()) {
+                node.add(toNode(childProject));
+            }
+            return node;
+        }
+    }
+
+    private class BuildAction<T> implements ActionListener {
+        private final ToolingOperation<T> operation;
+        private final UIOperation<T> uiOperation;
+
+        protected BuildAction(ToolingOperation<T> operation) {
             this.operation = operation;
+            uiOperation = new UIOperation<T>() {
+                @Override
+                public void failed() {
+                }
+
+                @Override
+                public void update(T result) {
+                }
+            };
+        }
+
+        protected BuildAction(ToolingOperation<T> operation, UIOperation<T> uiOperation) {
+            this.operation = operation;
+            this.uiOperation = uiOperation;
         }
 
         public void actionPerformed(ActionEvent actionEvent) {
@@ -147,6 +226,7 @@ public class UI {
                 public void run() {
                     final long startTime = System.currentTimeMillis();
                     Throwable failure = null;
+                    T result = null;
                     try {
                         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
                         if (distribution != null) {
@@ -161,10 +241,11 @@ public class UI {
                         }
                         ProjectConnection connection = connector.forProjectDirectory(projectDir).connect();
                         try {
-                            operation.run(connection, uiContext);
+                            result = operation.run(connection, uiContext);
                         } finally {
                             connection.close();
                         }
+
                     } catch (Throwable t) {
                         log.getError().println("FAILED WITH EXCEPTION");
                         t.printStackTrace(log.getError());
@@ -172,9 +253,15 @@ public class UI {
                     } finally {
                         final long endTime = System.currentTimeMillis();
                         final Throwable finalFailure = failure;
+                        final T finalResult = result;
                         SwingUtilities.invokeLater(new Runnable() {
                             public void run() {
                                 onFinishOperation(endTime - startTime, finalFailure);
+                                if (finalResult != null) {
+                                    uiOperation.update(finalResult);
+                                } else {
+                                    uiOperation.failed();
+                                }
                             }
                         });
                     }

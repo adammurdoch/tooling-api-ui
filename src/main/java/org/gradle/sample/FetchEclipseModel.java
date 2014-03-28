@@ -10,18 +10,19 @@ import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
 
 import java.io.PrintStream;
 
-class FetchEclipseModel implements UI.ToolingOperation {
+class FetchEclipseModel implements UI.ToolingOperation<Void> {
     @Override
     public String getDisplayName(UIContext uiContext) {
         return "fetch Eclipse model";
     }
 
     @Override
-    public void run(ProjectConnection connection, UIContext uiContext) {
+    public Void run(ProjectConnection connection, UIContext uiContext) {
         ModelBuilder<EclipseProject> model = connection.model(EclipseProject.class);
         uiContext.setup(model);
         EclipseProject project = model.get();
         show(project, uiContext.getConsoleStdOut());
+        return null;
     }
 
     private void show(EclipseProject project, PrintStream output) {

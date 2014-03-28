@@ -11,7 +11,7 @@ import org.gradle.tooling.model.idea.IdeaProject;
 import java.io.PrintStream;
 import java.io.Serializable;
 
-class RunBuildActionAction implements UI.ToolingOperation {
+class RunBuildActionAction implements UI.ToolingOperation<Void> {
     private static class MultiModel implements Serializable {
         GradleProject gradleProject;
         EclipseProject eclipseProject;
@@ -35,7 +35,7 @@ class RunBuildActionAction implements UI.ToolingOperation {
     }
 
     @Override
-    public void run(ProjectConnection connection, UIContext uiContext) {
+    public Void run(ProjectConnection connection, UIContext uiContext) {
         BuildActionExecuter<MultiModel> executer = connection.action(new ToolingBuildAction());
         uiContext.setup(executer);
         MultiModel result = executer.run();
@@ -62,5 +62,6 @@ class RunBuildActionAction implements UI.ToolingOperation {
         stdOut.format("Java language: %s%n", ideaProject.getLanguageLevel().getLevel());
         stdOut.format("output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getOutputDir());
         stdOut.format("test output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getTestOutputDir());
+        return null;
     }
 }
