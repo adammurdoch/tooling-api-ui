@@ -13,6 +13,7 @@ import org.gradle.tooling.model.gradle.GradleBuild;
 import org.gradle.tooling.model.idea.IdeaProject;
 
 import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
@@ -98,7 +99,6 @@ public class UI {
         panel.addToolbarControl(cancel);
         cancel.addActionListener(new CancelListener());
         for (VisualizationPanel visualizationPanel : panels) {
-            panel.addToolbarControl(visualizationPanel.getLaunchButton());
             panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
         }
         panel.addToolbarControl(runAction);
@@ -146,13 +146,14 @@ public class UI {
         private final JLayeredPane main;
         private final JLabel overlay;
         private final JPanel overlayPanel;
+        private final JScrollPane mainWrapper;
 
         private VisualizationPanel(ToolingOperation<? extends T> operation, Visualization<? super T> visualization) {
             this.visualization = visualization;
             this.main = new JLayeredPane();
 
             JComponent mainComponent = visualization.getMainComponent();
-            JScrollPane mainWrapper = new JScrollPane(mainComponent);
+            mainWrapper = new JScrollPane(mainComponent);
             main.add(mainWrapper, JLayeredPane.DEFAULT_LAYER);
 
             overlay = new JLabel();
@@ -165,16 +166,20 @@ public class UI {
             main.addComponentListener(new ComponentAdapter() {
                 @Override
                 public void componentResized(ComponentEvent e) {
-                    mainWrapper.setLocation(0, 0);
-                    mainWrapper.setSize(main.getSize());
                     resizeOverlay();
                 }
             });
             button = new JButton(visualization.getDisplayName());
             button.addActionListener(new BuildAction<>(operation, this));
+            main.add(button, JLayeredPane.DEFAULT_LAYER);
         }
 
         void resizeOverlay() {
+            Dimension buttonSize = button.getPreferredSize();
+            button.setLocation(main.getWidth() - buttonSize.width, 0);
+            button.setSize(buttonSize);
+            mainWrapper.setLocation(0, buttonSize.height + 5);
+            mainWrapper.setSize(main.getSize().width, main.getSize().height - mainWrapper.getY());
             overlayPanel.setSize(overlayPanel.getPreferredSize());
             overlayPanel.setLocation((main.getWidth() - overlayPanel.getWidth()) / 2,
                     (main.getHeight() - overlayPanel.getHeight()) / 4);
@@ -187,7 +192,6 @@ public class UI {
 
         @Override
         public void started() {
-            panel.showTab(visualization.getDisplayName());
             visualization.getMainComponent().setEnabled(false);
             overlay.setText("Loading");
             resizeOverlay();
@@ -197,6 +201,8 @@ public class UI {
         @Override
         public void update(T model) {
             overlayPanel.setVisible(false);
+            button.setText("Refresh");
+            resizeOverlay();
             visualization.getMainComponent().setEnabled(true);
             visualization.update(model);
         }
