@@ -16,6 +16,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class UI {
 
@@ -24,6 +25,7 @@ public class UI {
     private final JButton runAction;
     private final List<VisualizationPanel<?>> panels;
     private final JButton ideaModel;
+    private final JButton cancel;
     private final MainPanel panel;
     private final List<JButton> buttons;
     private final PathControl projectDirSelector;
@@ -33,6 +35,7 @@ public class UI {
     private final JCheckBox embedded;
     private final ConsolePanel console;
     private final ConsolePanel log;
+    private final AtomicReference<CancellationTokenSource> token = new AtomicReference<>();
     private final PrintStream originalStdOut;
     private final PrintStream originalStdErr;
 
@@ -43,6 +46,7 @@ public class UI {
         ideaModel = new JButton("IDEA model");
         runAction = new JButton("Client action");
         runBuild = new JButton("Build");
+        cancel = new JButton("Cancel");
         VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModel<>(GradleBuild.class), new ProjectTree());
         VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModel<>(BuildInvocations.class), new TasksTable());
         panels = Arrays.asList(projects, tasks);
@@ -67,7 +71,7 @@ public class UI {
     }
 
     public static void main(String[] args) {
-        new UI().go();
+        SwingUtilities.invokeLater(() -> new UI().go());
     }
 
     void go() {
@@ -89,6 +93,8 @@ public class UI {
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
         panel.addToolbarControl(runBuild);
         runBuild.addActionListener(new BuildAction<>(new RunBuildAction()));
+        panel.addToolbarControl(cancel);
+        cancel.addActionListener(new CancelListener());
         for (VisualizationPanel visualizationPanel : panels) {
             panel.addToolbarControl(visualizationPanel.getLaunchButton());
             panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
@@ -99,6 +105,7 @@ public class UI {
         ideaModel.addActionListener(new BuildAction<>(new FetchIdeaModel()));
         panel.addToolbarControl(runAction);
         runAction.addActionListener(new BuildAction<>(new RunBuildActionAction()));
+        initButtons();
         frame.setSize(1000, 800);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
@@ -108,6 +115,7 @@ public class UI {
         for (JButton button : buttons) {
             button.setEnabled(false);
         }
+        cancel.setEnabled(true);
         console.clearOutput();
         panel.onProgress("");
         log.getOutput().println("================");
@@ -122,9 +130,14 @@ public class UI {
         log.getOutput().flush();
         log.getError().flush();
         panel.onProgress((failure == null ? "Finished" : "Failed") + " (" + timeMillis / 1000 + " seconds)");
+        initButtons();
+    }
+
+    private void initButtons() {
         for (JButton button : buttons) {
             button.setEnabled(true);
         }
+        cancel.setEnabled(false);
     }
 
     private class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
@@ -237,9 +250,12 @@ public class UI {
             final File distribution = useDistribution.isSelected() ? installation.getFile() : null;
             final boolean isEmbedded = embedded.isSelected();
             final String[] commandLine = commandLineArgs.getText().trim().split("\\s+");
+            final CancellationTokenSource tokenSource = DefaultGradleConnector.newCancellationTokenSource();
+            token.set(tokenSource);
             final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(), Arrays.asList(commandLine)) {
                 @Override
                 public void setup(LongRunningOperation operation) {
+                    operation.withCancellationToken(tokenSource.token());
                     operation.addProgressListener(new ProgressListener() {
                         public void statusChanged(ProgressEvent event) {
                             log.getOutput().println("[progress: " + event.getDescription() + "]");
@@ -302,6 +318,15 @@ public class UI {
                     }
                 }
             }.start();
+        }
+    }
+
+    private class CancelListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            // TODO - do this in the background
+            System.out.println("Cancelling...");
+            token.get().cancel();
         }
     }
 }
