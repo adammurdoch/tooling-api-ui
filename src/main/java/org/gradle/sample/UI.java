@@ -18,14 +18,17 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.List;
 
 public class UI {
 
-    private final JButton buildModel;
+    private final JButton eclipseModel;
     private final JButton runBuild;
     private final JButton runAction;
     private final JButton projects;
+    private final JButton ideaModel;
     private final MainPanel panel;
+    private final List<JButton> buttons;
     private final PathControl projectDirSelector;
     private final JRadioButton useDistribution;
     private final PathControl installation;
@@ -39,10 +42,12 @@ public class UI {
     public UI() {
         originalStdOut = System.out;
         originalStdErr = System.err;
-        buildModel = new JButton("Eclipse model");
+        eclipseModel = new JButton("Eclipse model");
+        ideaModel = new JButton("IDEA model");
         runAction = new JButton("Client action");
         runBuild = new JButton("Build");
         projects = new JButton("Projects");
+        buttons = Arrays.asList(eclipseModel, ideaModel, projects, runAction, runBuild);
         panel = new MainPanel();
         console = panel.getConsole();
         log = panel.getLog();
@@ -82,8 +87,10 @@ public class UI {
         JTree projects = new JTree();
         panel.addTab("Projects", projects);
         this.projects.addActionListener(new BuildAction<>(new GetBuildModel(), new ProjectTree(projects)));
-        panel.addToolbarControl(buildModel);
-        buildModel.addActionListener(new BuildAction<>(new FetchEclipseModel()));
+        panel.addToolbarControl(eclipseModel);
+        eclipseModel.addActionListener(new BuildAction<>(new FetchEclipseModel()));
+        panel.addToolbarControl(ideaModel);
+        ideaModel.addActionListener(new BuildAction<>(new FetchIdeaModel()));
         panel.addToolbarControl(runAction);
         runAction.addActionListener(new BuildAction<>(new RunBuildActionAction()));
         frame.setSize(1000, 800);
@@ -92,10 +99,9 @@ public class UI {
     }
 
     private void onStartOperation(String displayName) {
-        buildModel.setEnabled(false);
-        runBuild.setEnabled(false);
-        runAction.setEnabled(false);
-        projects.setEnabled(false);
+        for (JButton button : buttons) {
+            button.setEnabled(false);
+        }
         console.clearOutput();
         panel.onProgress("");
         log.getOutput().println("================");
@@ -110,10 +116,9 @@ public class UI {
         log.getOutput().flush();
         log.getError().flush();
         panel.onProgress((failure == null ? "Finished" : "Failed") + " (" + timeMillis / 1000 + " seconds)");
-        buildModel.setEnabled(true);
-        runBuild.setEnabled(true);
-        runAction.setEnabled(true);
-        projects.setEnabled(true);
+        for (JButton button : buttons) {
+            button.setEnabled(true);
+        }
     }
 
     public interface ToolingOperation<T> {
