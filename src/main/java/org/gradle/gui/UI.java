@@ -1,10 +1,18 @@
 package org.gradle.gui;
 
-import org.gradle.gui.actions.*;
+import org.gradle.gui.actions.FetchModel;
+import org.gradle.gui.actions.RunBuildAction;
+import org.gradle.gui.actions.RunBuildActionAction;
+import org.gradle.gui.visualizations.EclipseModelReport;
+import org.gradle.gui.visualizations.IdeaModelReport;
+import org.gradle.gui.visualizations.ProjectTree;
+import org.gradle.gui.visualizations.TasksTable;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
+import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.gradle.BuildInvocations;
 import org.gradle.tooling.model.gradle.GradleBuild;
+import org.gradle.tooling.model.idea.IdeaProject;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;
@@ -20,11 +28,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class UI {
 
-    private final JButton eclipseModel;
     private final JButton runBuild;
     private final JButton runAction;
     private final List<VisualizationPanel<?>> panels;
-    private final JButton ideaModel;
     private final JButton cancel;
     private final MainPanel panel;
     private final List<JButton> buttons;
@@ -42,17 +48,15 @@ public class UI {
     public UI() {
         originalStdOut = System.out;
         originalStdErr = System.err;
-        eclipseModel = new JButton("Eclipse model");
-        ideaModel = new JButton("IDEA model");
         runAction = new JButton("Client action");
         runBuild = new JButton("Build");
         cancel = new JButton("Cancel");
         VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModel<>(GradleBuild.class), new ProjectTree());
         VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModel<>(BuildInvocations.class), new TasksTable());
-        panels = Arrays.asList(projects, tasks);
+        VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModel<>(EclipseProject.class), new EclipseModelReport());
+        VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModel<>(IdeaProject.class), new IdeaModelReport());
+        panels = Arrays.asList(projects, tasks, eclipseProject, ideaProject);
         buttons = new ArrayList<>();
-        buttons.add(eclipseModel);
-        buttons.add(ideaModel);
         buttons.add(runAction);
         buttons.add(runBuild);
         for (VisualizationPanel<?> visualizationPanel : panels) {
@@ -99,10 +103,6 @@ public class UI {
             panel.addToolbarControl(visualizationPanel.getLaunchButton());
             panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
         }
-        panel.addToolbarControl(eclipseModel);
-        eclipseModel.addActionListener(new BuildAction<>(new FetchEclipseModel()));
-        panel.addToolbarControl(ideaModel);
-        ideaModel.addActionListener(new BuildAction<>(new FetchIdeaModel()));
         panel.addToolbarControl(runAction);
         runAction.addActionListener(new BuildAction<>(new RunBuildActionAction()));
         initButtons();

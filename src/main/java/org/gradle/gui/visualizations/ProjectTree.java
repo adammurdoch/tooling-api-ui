@@ -1,5 +1,6 @@
-package org.gradle.gui;
+package org.gradle.gui.visualizations;
 
+import org.gradle.gui.Visualization;
 import org.gradle.tooling.model.gradle.BasicGradleProject;
 import org.gradle.tooling.model.gradle.GradleBuild;
 
