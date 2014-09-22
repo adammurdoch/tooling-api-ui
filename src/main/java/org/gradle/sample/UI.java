@@ -1,20 +1,15 @@
 package org.gradle.sample;
 
-import org.gradle.gui.ConsolePanel;
-import org.gradle.gui.MainPanel;
-import org.gradle.gui.PathControl;
-import org.gradle.gui.UIContext;
+import org.gradle.gui.*;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
-import org.gradle.tooling.model.gradle.BasicGradleProject;
 import org.gradle.tooling.model.gradle.GradleBuild;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.MutableTreeNode;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.Arrays;
@@ -25,7 +20,7 @@ public class UI {
     private final JButton eclipseModel;
     private final JButton runBuild;
     private final JButton runAction;
-    private final JButton projects;
+    private final VisualizationPanel<GradleBuild> projects;
     private final JButton ideaModel;
     private final MainPanel panel;
     private final List<JButton> buttons;
@@ -46,8 +41,8 @@ public class UI {
         ideaModel = new JButton("IDEA model");
         runAction = new JButton("Client action");
         runBuild = new JButton("Build");
-        projects = new JButton("Projects");
-        buttons = Arrays.asList(eclipseModel, ideaModel, projects, runAction, runBuild);
+        projects = new VisualizationPanel<>(new GetBuildModel(), new ProjectTree());
+        buttons = Arrays.asList(eclipseModel, ideaModel, projects.getLaunchButton(), runAction, runBuild);
         panel = new MainPanel();
         console = panel.getConsole();
         log = panel.getLog();
@@ -83,10 +78,8 @@ public class UI {
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
         panel.addToolbarControl(runBuild);
         runBuild.addActionListener(new BuildAction<>(new RunBuildAction()));
-        panel.addToolbarControl(projects);
-        JTree projects = new JTree();
-        panel.addTab("Projects", projects);
-        this.projects.addActionListener(new BuildAction<>(new GetBuildModel(), new ProjectTree(projects)));
+        panel.addToolbarControl(projects.getLaunchButton());
+        panel.addTab(projects.visualization.getDisplayName(), projects.getMainComponent());
         panel.addToolbarControl(eclipseModel);
         eclipseModel.addActionListener(new BuildAction<>(new FetchEclipseModel()));
         panel.addToolbarControl(ideaModel);
@@ -95,7 +88,7 @@ public class UI {
         runAction.addActionListener(new BuildAction<>(new RunBuildActionAction()));
         frame.setSize(1000, 800);
         frame.setVisible(true);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     }
 
     private void onStartOperation(String displayName) {
@@ -130,15 +123,6 @@ public class UI {
         T run(ProjectConnection connection, UIContext uiContext);
     }
 
-    public interface UIOperation<T> {
-        void failed();
-
-        /**
-         * Updates the UI. Called from the AWT event thread.
-         */
-        void update(T result);
-    }
-
     private static class GetBuildModel implements ToolingOperation<GradleBuild> {
         @Override
         public String getDisplayName(UIContext uiContext) {
@@ -153,54 +137,105 @@ public class UI {
         }
     }
 
-    private static class ProjectTree implements UIOperation<GradleBuild> {
-        JTree tree;
+    private class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
+        private final Visualization<? super T> visualization;
+        private final JButton button;
+        private final JLayeredPane main;
+        private final JLabel overlay;
+        private final JPanel overlayPanel;
 
-        private ProjectTree(JTree tree) {
-            this.tree = tree;
-            tree.setModel(new DefaultTreeModel(new DefaultMutableTreeNode()));
+        private VisualizationPanel(ToolingOperation<? extends T> operation, Visualization<? super T> visualization) {
+            this.visualization = visualization;
+            this.main = new JLayeredPane();
+            JComponent mainComponent = visualization.getMainComponent();
+            main.add(mainComponent, JLayeredPane.DEFAULT_LAYER);
+            overlay = new JLabel();
+            overlayPanel = new JPanel();
+            overlayPanel.add(overlay);
+            overlayPanel.setVisible(false);
+            main.add(overlayPanel, JLayeredPane.MODAL_LAYER);
+            main.addComponentListener(new ComponentAdapter() {
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    mainComponent.setLocation(0, 0);
+                    mainComponent.setSize(main.getSize());
+                    resizeOverlay();
+                }
+            });
+            button = new JButton(visualization.getDisplayName());
+            button.addActionListener(new BuildAction<>(operation, this));
+        }
+
+        void resizeOverlay() {
+            overlayPanel.setSize(overlayPanel.getPreferredSize());
+            overlayPanel.setLocation((main.getWidth() - overlayPanel.getWidth()) / 2,
+                    (main.getHeight() - overlayPanel.getHeight()) / 2);
+        }
+
+        @Override
+        public String getDisplayName() {
+            return visualization.getDisplayName();
+        }
+
+        @Override
+        public void started() {
+            visualization.getMainComponent().setEnabled(false);
+            overlay.setText("Fetching");
+            resizeOverlay();
+            overlayPanel.setVisible(true);
+        }
+
+        @Override
+        public void update(T model) {
+            overlayPanel.setVisible(false);
+            visualization.getMainComponent().setEnabled(true);
+            visualization.update(model);
         }
 
         @Override
         public void failed() {
-            tree.setModel(new DefaultTreeModel(new DefaultMutableTreeNode("FAILED")));
+            overlayPanel.setVisible(false);
+            visualization.failed();
         }
 
-        @Override
-        public void update(GradleBuild gradleBuild) {
-            tree.setModel(new DefaultTreeModel(toNode(gradleBuild.getRootProject())));
+        public JButton getLaunchButton() {
+            return button;
         }
 
-        private MutableTreeNode toNode(BasicGradleProject project) {
-            DefaultMutableTreeNode node = new DefaultMutableTreeNode();
-            node.setUserObject(String.format("Project %s", project.getName()));
-            for (BasicGradleProject childProject : project.getChildren()) {
-                node.add(toNode(childProject));
-            }
-            return node;
+        public JComponent getMainComponent() {
+            return main;
         }
     }
 
     private class BuildAction<T> implements ActionListener {
-        private final ToolingOperation<T> operation;
-        private final UIOperation<T> uiOperation;
+        private final ToolingOperation<? extends T> operation;
+        private final ProgressAwareVisualization<? super T> visualization;
 
         protected BuildAction(ToolingOperation<T> operation) {
             this.operation = operation;
-            uiOperation = new UIOperation<T>() {
-                @Override
+            visualization = new ProgressAwareVisualization<T>() {
+                public String getDisplayName() {
+                    return null;
+                }
+
+                public void started() {
+                }
+
+                public JComponent getMainComponent() {
+                    return null;
+                }
+
                 public void failed() {
                 }
 
-                @Override
                 public void update(T result) {
                 }
             };
         }
 
-        protected BuildAction(ToolingOperation<T> operation, UIOperation<T> uiOperation) {
+        protected BuildAction(ToolingOperation<? extends T> operation, ProgressAwareVisualization<? super T> visualization) {
             this.operation = operation;
-            this.uiOperation = uiOperation;
+            this.visualization = visualization;
         }
 
         public void actionPerformed(ActionEvent actionEvent) {
@@ -226,6 +261,7 @@ public class UI {
             };
             onStartOperation(operation.getDisplayName(uiContext));
             panel.onProgress("building for project dir: " + projectDir);
+            visualization.started();
             new Thread() {
                 @Override
                 public void run() {
@@ -263,9 +299,9 @@ public class UI {
                             public void run() {
                                 onFinishOperation(endTime - startTime, finalFailure);
                                 if (finalResult != null) {
-                                    uiOperation.update(finalResult);
+                                    visualization.update(finalResult);
                                 } else {
-                                    uiOperation.failed();
+                                    visualization.failed();
                                 }
                             }
                         });
