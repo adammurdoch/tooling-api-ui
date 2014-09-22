@@ -12,7 +12,7 @@ public abstract class Report<T> implements Visualization<T> {
 
     public Report() {
         this.text = new JTextPane();
-        text.setFont(new Font("monospaced", Font.PLAIN, 12));
+        text.setFont(new Font("monospaced", Font.PLAIN, 13));
         text.setEditable(false);
     }
 
