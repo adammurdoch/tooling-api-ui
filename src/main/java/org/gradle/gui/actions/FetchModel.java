@@ -4,17 +4,22 @@ import org.gradle.gui.ToolingOperation;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.ModelBuilder;
 import org.gradle.tooling.ProjectConnection;
-import org.gradle.tooling.model.gradle.GradleBuild;
 
-public class GetBuildModel implements ToolingOperation<GradleBuild> {
-    @Override
-    public String getDisplayName(UIContext uiContext) {
-        return "fetch projects";
+public class FetchModel<T> implements ToolingOperation<T> {
+    private final Class<T> type;
+
+    public FetchModel(Class<T> type) {
+        this.type = type;
     }
 
     @Override
-    public GradleBuild run(ProjectConnection connection, UIContext uiContext) {
-        ModelBuilder<GradleBuild> builder = connection.model(GradleBuild.class);
+    public String getDisplayName(UIContext uiContext) {
+        return "fetch " + type.getSimpleName();
+    }
+
+    @Override
+    public T run(ProjectConnection connection, UIContext uiContext) {
+        ModelBuilder<T> builder = connection.model(type);
         uiContext.setup(builder);
         return builder.get();
     }

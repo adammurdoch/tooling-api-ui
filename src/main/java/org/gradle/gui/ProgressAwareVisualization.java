@@ -5,4 +5,6 @@ package org.gradle.gui;
  */
 public interface ProgressAwareVisualization<T> extends Visualization<T> {
     void started();
+
+    void failed();
 }

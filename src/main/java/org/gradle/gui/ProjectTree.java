@@ -26,10 +26,6 @@ public class ProjectTree implements Visualization<GradleBuild> {
         return tree;
     }
 
-    public void failed() {
-        tree.setModel(new DefaultTreeModel(new DefaultMutableTreeNode("FAILED")));
-    }
-
     public void update(GradleBuild gradleBuild) {
         tree.setModel(new DefaultTreeModel(toNode(gradleBuild.getRootProject())));
     }

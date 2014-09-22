@@ -13,6 +13,4 @@ public interface Visualization<T> {
     JComponent getMainComponent();
 
     void update(T model);
-
-    void failed();
 }

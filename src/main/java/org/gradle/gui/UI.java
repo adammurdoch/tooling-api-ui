@@ -3,6 +3,7 @@ package org.gradle.gui;
 import org.gradle.gui.actions.*;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
+import org.gradle.tooling.model.gradle.BuildInvocations;
 import org.gradle.tooling.model.gradle.GradleBuild;
 
 import javax.swing.*;
@@ -12,6 +13,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.io.File;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -20,7 +22,7 @@ public class UI {
     private final JButton eclipseModel;
     private final JButton runBuild;
     private final JButton runAction;
-    private final VisualizationPanel<GradleBuild> projects;
+    private final List<VisualizationPanel<?>> panels;
     private final JButton ideaModel;
     private final MainPanel panel;
     private final List<JButton> buttons;
@@ -41,8 +43,17 @@ public class UI {
         ideaModel = new JButton("IDEA model");
         runAction = new JButton("Client action");
         runBuild = new JButton("Build");
-        projects = new VisualizationPanel<>(new GetBuildModel(), new ProjectTree());
-        buttons = Arrays.asList(eclipseModel, ideaModel, projects.getLaunchButton(), runAction, runBuild);
+        VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModel<>(GradleBuild.class), new ProjectTree());
+        VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModel<>(BuildInvocations.class), new TasksTable());
+        panels = Arrays.asList(projects, tasks);
+        buttons = new ArrayList<>();
+        buttons.add(eclipseModel);
+        buttons.add(ideaModel);
+        buttons.add(runAction);
+        buttons.add(runBuild);
+        for (VisualizationPanel<?> visualizationPanel : panels) {
+            buttons.add(visualizationPanel.getLaunchButton());
+        }
         panel = new MainPanel();
         console = panel.getConsole();
         log = panel.getLog();
@@ -78,8 +89,10 @@ public class UI {
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
         panel.addToolbarControl(runBuild);
         runBuild.addActionListener(new BuildAction<>(new RunBuildAction()));
-        panel.addToolbarControl(projects.getLaunchButton());
-        panel.addTab(projects.visualization.getDisplayName(), projects.getMainComponent());
+        for (VisualizationPanel visualizationPanel : panels) {
+            panel.addToolbarControl(visualizationPanel.getLaunchButton());
+            panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
+        }
         panel.addToolbarControl(eclipseModel);
         eclipseModel.addActionListener(new BuildAction<>(new FetchEclipseModel()));
         panel.addToolbarControl(ideaModel);
@@ -124,18 +137,23 @@ public class UI {
         private VisualizationPanel(ToolingOperation<? extends T> operation, Visualization<? super T> visualization) {
             this.visualization = visualization;
             this.main = new JLayeredPane();
+
             JComponent mainComponent = visualization.getMainComponent();
-            main.add(mainComponent, JLayeredPane.DEFAULT_LAYER);
+            JScrollPane mainWrapper = new JScrollPane(mainComponent);
+            main.add(mainWrapper, JLayeredPane.DEFAULT_LAYER);
+
             overlay = new JLabel();
+            overlay.setText(String.format("Click '%s' to load", visualization.getDisplayName()));
+            overlay.setFont(overlay.getFont().deriveFont(18f));
             overlayPanel = new JPanel();
             overlayPanel.add(overlay);
-            overlayPanel.setVisible(false);
+            overlayPanel.setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
             main.add(overlayPanel, JLayeredPane.MODAL_LAYER);
             main.addComponentListener(new ComponentAdapter() {
                 @Override
                 public void componentResized(ComponentEvent e) {
-                    mainComponent.setLocation(0, 0);
-                    mainComponent.setSize(main.getSize());
+                    mainWrapper.setLocation(0, 0);
+                    mainWrapper.setSize(main.getSize());
                     resizeOverlay();
                 }
             });
@@ -146,7 +164,7 @@ public class UI {
         void resizeOverlay() {
             overlayPanel.setSize(overlayPanel.getPreferredSize());
             overlayPanel.setLocation((main.getWidth() - overlayPanel.getWidth()) / 2,
-                    (main.getHeight() - overlayPanel.getHeight()) / 2);
+                    (main.getHeight() - overlayPanel.getHeight()) / 4);
         }
 
         @Override
@@ -157,7 +175,7 @@ public class UI {
         @Override
         public void started() {
             visualization.getMainComponent().setEnabled(false);
-            overlay.setText("Fetching");
+            overlay.setText("Loading");
             resizeOverlay();
             overlayPanel.setVisible(true);
         }
@@ -171,8 +189,7 @@ public class UI {
 
         @Override
         public void failed() {
-            overlayPanel.setVisible(false);
-            visualization.failed();
+            overlay.setText("Failed");
         }
 
         public JButton getLaunchButton() {
