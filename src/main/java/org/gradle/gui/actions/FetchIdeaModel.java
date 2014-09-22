@@ -1,5 +1,6 @@
-package org.gradle.sample;
+package org.gradle.gui.actions;
 
+import org.gradle.gui.ToolingOperation;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.ModelBuilder;
 import org.gradle.tooling.ProjectConnection;
@@ -9,7 +10,7 @@ import org.gradle.tooling.model.idea.IdeaProject;
 
 import java.io.PrintStream;
 
-class FetchIdeaModel implements UI.ToolingOperation<Void> {
+public class FetchIdeaModel implements ToolingOperation<Void> {
     @Override
     public String getDisplayName(UIContext uiContext) {
         return "fetch IDEA model";

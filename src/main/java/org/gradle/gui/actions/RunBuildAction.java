@@ -1,10 +1,11 @@
-package org.gradle.sample;
+package org.gradle.gui.actions;
 
+import org.gradle.gui.ToolingOperation;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.BuildLauncher;
 import org.gradle.tooling.ProjectConnection;
 
-class RunBuildAction implements UI.ToolingOperation<Void> {
+public class RunBuildAction implements ToolingOperation<Void> {
     @Override
     public String getDisplayName(UIContext uiContext) {
         return "build using " + uiContext.getCommandLineArgs();

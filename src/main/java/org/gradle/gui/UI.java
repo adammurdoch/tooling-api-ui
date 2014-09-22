@@ -1,6 +1,6 @@
-package org.gradle.sample;
+package org.gradle.gui;
 
-import org.gradle.gui.*;
+import org.gradle.gui.actions.*;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
 import org.gradle.tooling.model.gradle.GradleBuild;
@@ -111,29 +111,6 @@ public class UI {
         panel.onProgress((failure == null ? "Finished" : "Failed") + " (" + timeMillis / 1000 + " seconds)");
         for (JButton button : buttons) {
             button.setEnabled(true);
-        }
-    }
-
-    public interface ToolingOperation<T> {
-        String getDisplayName(UIContext uiContext);
-
-        /**
-         * Executes this operation and returns some result. Called from a non-UI thread.
-         */
-        T run(ProjectConnection connection, UIContext uiContext);
-    }
-
-    private static class GetBuildModel implements ToolingOperation<GradleBuild> {
-        @Override
-        public String getDisplayName(UIContext uiContext) {
-            return "fetch projects";
-        }
-
-        @Override
-        public GradleBuild run(ProjectConnection connection, UIContext uiContext) {
-            ModelBuilder<GradleBuild> builder = connection.model(GradleBuild.class);
-            uiContext.setup(builder);
-            return builder.get();
         }
     }
 

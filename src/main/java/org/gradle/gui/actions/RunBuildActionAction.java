@@ -1,5 +1,6 @@
-package org.gradle.sample;
+package org.gradle.gui.actions;
 
+import org.gradle.gui.ToolingOperation;
 import org.gradle.gui.UIContext;
 import org.gradle.tooling.BuildActionExecuter;
 import org.gradle.tooling.BuildController;
@@ -11,7 +12,7 @@ import org.gradle.tooling.model.idea.IdeaProject;
 import java.io.PrintStream;
 import java.io.Serializable;
 
-class RunBuildActionAction implements UI.ToolingOperation<Void> {
+public class RunBuildActionAction implements ToolingOperation<Void> {
     private static class MultiModel implements Serializable {
         GradleProject gradleProject;
         EclipseProject eclipseProject;
