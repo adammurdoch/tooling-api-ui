@@ -3,12 +3,10 @@ package org.gradle.gui;
 import org.gradle.gui.actions.FetchModel;
 import org.gradle.gui.actions.RunBuildAction;
 import org.gradle.gui.actions.RunBuildActionAction;
-import org.gradle.gui.visualizations.EclipseModelReport;
-import org.gradle.gui.visualizations.IdeaModelReport;
-import org.gradle.gui.visualizations.ProjectTree;
-import org.gradle.gui.visualizations.TasksTable;
+import org.gradle.gui.visualizations.*;
 import org.gradle.tooling.*;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
+import org.gradle.tooling.model.build.BuildEnvironment;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.gradle.BuildInvocations;
 import org.gradle.tooling.model.gradle.GradleBuild;
@@ -28,6 +26,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class UI {
 
+    public static final String DEFAULT_VERSION = "Default";
+    public static final String LOCAL_DISTRIBUTION = "Local distribution";
     private final JButton runBuild;
     private final JButton runAction;
     private final List<VisualizationPanel<?>> panels;
@@ -35,7 +35,6 @@ public class UI {
     private final MainPanel panel;
     private final List<JButton> buttons;
     private final PathControl projectDirSelector;
-    private final JRadioButton useDistribution;
     private final PathControl installation;
     private final JTextField commandLineArgs;
     private final JCheckBox embedded;
@@ -44,6 +43,7 @@ public class UI {
     private final AtomicReference<CancellationTokenSource> token = new AtomicReference<>();
     private final PrintStream originalStdOut;
     private final PrintStream originalStdErr;
+    private final JComboBox<Object> gradleVersion;
 
     public UI() {
         originalStdOut = System.out;
@@ -53,9 +53,10 @@ public class UI {
         cancel = new JButton("Cancel");
         VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModel<>(GradleBuild.class), new ProjectTree());
         VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModel<>(BuildInvocations.class), new TasksTable());
+        VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModel<>(BuildEnvironment.class), new BuildEnvironmentReport());
         VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModel<>(EclipseProject.class), new EclipseModelReport());
         VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModel<>(IdeaProject.class), new IdeaModelReport());
-        panels = Arrays.asList(projects, tasks, eclipseProject, ideaProject);
+        panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject);
         buttons = new ArrayList<>();
         buttons.add(runAction);
         buttons.add(runBuild);
@@ -68,10 +69,10 @@ public class UI {
         System.setOut(log.getOutput());
         System.setErr(log.getError());
         projectDirSelector = new PathControl();
-        useDistribution = new JRadioButton("Use distribution");
         installation = new PathControl();
         commandLineArgs = new JTextField();
         embedded = new JCheckBox("Embedded");
+        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "2.1", "2.0", "1.12", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2"});
     }
 
     public static void main(String[] args) {
@@ -83,17 +84,11 @@ public class UI {
         frame.setContentPane(panel);
 
         SettingsPanel settings = panel.getSettings();
-        projectDirSelector.setFile(new File("/Users/adam/gradle/test-projects/minimal"));
+        projectDirSelector.setFile(new File("/Users/adam/gradle/test-projects/tooling"));
         settings.addControl("Project directory", projectDirSelector);
-        JRadioButton useDefaultDir = new JRadioButton("Use default distribution");
-        settings.addControl(useDefaultDir);
-        settings.addControl(useDistribution);
+        settings.addControl("Gradle version", gradleVersion);
         installation.setFile(new File("/Users/adam/gradle/current"));
         settings.addControl("Distribution", installation);
-        ButtonGroup distSelector = new ButtonGroup();
-        distSelector.add(useDefaultDir);
-        distSelector.add(useDistribution);
-        useDistribution.setSelected(true);
         settings.addControl(embedded);
 
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
@@ -254,7 +249,19 @@ public class UI {
 
         public void actionPerformed(ActionEvent actionEvent) {
             final File projectDir = projectDirSelector.getFile();
-            final File distribution = useDistribution.isSelected() ? installation.getFile() : null;
+            final File distribution;
+            final String version;
+            if (gradleVersion.getSelectedItem().equals(LOCAL_DISTRIBUTION)) {
+                distribution = installation.getFile();
+                version = null;
+            } else if (gradleVersion.getSelectedItem().equals(DEFAULT_VERSION)) {
+                distribution = null;
+                version = null;
+            } else {
+                distribution = null;
+                version = gradleVersion.getSelectedItem().toString();
+            }
+
             final boolean isEmbedded = embedded.isSelected();
             final String[] commandLine = commandLineArgs.getText().trim().split("\\s+");
             final CancellationTokenSource tokenSource = DefaultGradleConnector.newCancellationTokenSource();
@@ -293,6 +300,9 @@ public class UI {
                             } else {
                                 connector.useDistribution(distribution.toURI());
                             }
+                        }
+                        if (version != null) {
+                            connector.useGradleVersion(version);
                         }
                         if (isEmbedded) {
                             connector.embedded(true);
