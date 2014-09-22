@@ -2,14 +2,17 @@ package org.gradle.gui;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainPanel extends JPanel {
-    private final JPanel settings;
+    private final SettingsPanel settings;
     private final JPanel toolbar;
     private final JLabel progress;
     private final ConsolePanel console;
     private final ConsolePanel log;
     private final JTabbedPane tabs;
+    private final Map<String, Integer> tabTitles = new HashMap<>();
     private int insertIndex = 1;
 
     public MainPanel() {
@@ -30,8 +33,7 @@ public class MainPanel extends JPanel {
         log = new ConsolePanel();
         tabs.addTab("Log", new JScrollPane(log));
 
-        settings = new JPanel();
-        settings.setLayout(new BoxLayout(settings, BoxLayout.Y_AXIS));
+        settings = new SettingsPanel();
         tabs.addTab("Settings", settings);
 
         progress = new JLabel();
@@ -40,6 +42,7 @@ public class MainPanel extends JPanel {
 
     public void addTab(String title, JComponent component) {
         tabs.insertTab(title, null, component, title, insertIndex);
+        tabTitles.put(title, insertIndex);
         insertIndex++;
     }
 
@@ -51,17 +54,16 @@ public class MainPanel extends JPanel {
         toolbar.add(component);
     }
 
-    public void addControl(AbstractButton button) {
-        settings.add(button);
-    }
-
-    public void addControl(String title, JComponent comp) {
-        settings.add(new JLabel(title));
-        settings.add(comp);
+    public void showTab(String title) {
+        tabs.setSelectedIndex(tabTitles.get(title));
     }
 
     public void showConsole() {
         tabs.setSelectedIndex(0);
+    }
+
+    public SettingsPanel getSettings() {
+        return settings;
     }
 
     public ConsolePanel getConsole() {

@@ -27,6 +27,7 @@ public class ConsolePanel extends JPanel {
         output = new JTextPane();
         output.setEditable(false);
         output.setEnabled(false);
+        output.setFont(new Font("monospaced", Font.PLAIN, 12));
         output.setText("output goes here..");
         stdout = output.addStyle("stdout", null);
         stderr = output.addStyle("stderr", null);

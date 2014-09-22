@@ -81,18 +81,21 @@ public class UI {
     void go() {
         JFrame frame = new JFrame("Tooling API Test UI");
         frame.setContentPane(panel);
+
+        SettingsPanel settings = panel.getSettings();
         projectDirSelector.setFile(new File("/Users/adam/gradle/test-projects/minimal"));
-        panel.addControl("Project directory", projectDirSelector);
+        settings.addControl("Project directory", projectDirSelector);
         JRadioButton useDefaultDir = new JRadioButton("Use default distribution");
-        panel.addControl(useDefaultDir);
-        panel.addControl(useDistribution);
+        settings.addControl(useDefaultDir);
+        settings.addControl(useDistribution);
         installation.setFile(new File("/Users/adam/gradle/current"));
-        panel.addControl("Distribution", installation);
+        settings.addControl("Distribution", installation);
         ButtonGroup distSelector = new ButtonGroup();
         distSelector.add(useDefaultDir);
         distSelector.add(useDistribution);
         useDistribution.setSelected(true);
-        panel.addControl(embedded);
+        settings.addControl(embedded);
+
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
         panel.addToolbarControl(runBuild);
@@ -189,6 +192,7 @@ public class UI {
 
         @Override
         public void started() {
+            panel.showTab(visualization.getDisplayName());
             visualization.getMainComponent().setEnabled(false);
             overlay.setText("Loading");
             resizeOverlay();
