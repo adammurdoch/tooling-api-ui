@@ -1,6 +1,7 @@
 package org.gradle.gui;
 
 import org.gradle.gui.actions.FetchModel;
+import org.gradle.gui.actions.MultiModel;
 import org.gradle.gui.actions.RunBuildAction;
 import org.gradle.gui.actions.RunBuildActionAction;
 import org.gradle.gui.visualizations.*;
@@ -30,7 +31,6 @@ public class UI {
     public static final String DEFAULT_VERSION = "Default";
     public static final String LOCAL_DISTRIBUTION = "Local distribution";
     private final JButton runBuild;
-    private final JButton runAction;
     private final List<VisualizationPanel<?>> panels;
     private final JButton cancel;
     private final MainPanel panel;
@@ -49,7 +49,6 @@ public class UI {
     public UI() {
         originalStdOut = System.out;
         originalStdErr = System.err;
-        runAction = new JButton("Client action");
         runBuild = new JButton("Build");
         cancel = new JButton("Cancel");
         VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModel<>(GradleBuild.class), new ProjectTree());
@@ -57,9 +56,9 @@ public class UI {
         VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModel<>(BuildEnvironment.class), new BuildEnvironmentReport());
         VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModel<>(EclipseProject.class), new EclipseModelReport());
         VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModel<>(IdeaProject.class), new IdeaModelReport());
-        panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject);
+        VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionAction(), new MultiModelReport());
+        panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject, multiModel);
         buttons = new ArrayList<>();
-        buttons.add(runAction);
         buttons.add(runBuild);
         for (VisualizationPanel<?> visualizationPanel : panels) {
             buttons.add(visualizationPanel.getLaunchButton());
@@ -101,8 +100,6 @@ public class UI {
         for (VisualizationPanel visualizationPanel : panels) {
             panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
         }
-        panel.addToolbarControl(runAction);
-        runAction.addActionListener(new BuildAction<>(new RunBuildActionAction()));
         initButtons();
         frame.setSize(1000, 800);
         frame.setVisible(true);
