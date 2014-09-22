@@ -1,7 +1,6 @@
 package org.gradle.gui;
 
 import javax.swing.*;
-import java.awt.*;
 
 public class SettingsPanel extends JPanel {
     private final GroupLayout layout;
@@ -15,7 +14,7 @@ public class SettingsPanel extends JPanel {
         layout.setAutoCreateGaps(true);
         layout.setAutoCreateContainerGaps(true);
         titles = layout.createParallelGroup(GroupLayout.Alignment.TRAILING);
-        components = layout.createParallelGroup();
+        components = layout.createParallelGroup(GroupLayout.Alignment.LEADING, false);
         GroupLayout.SequentialGroup horizontal = layout.createSequentialGroup();
         horizontal.addGroup(titles);
         horizontal.addGroup(components);
@@ -32,8 +31,8 @@ public class SettingsPanel extends JPanel {
     public void addControl(String title, JComponent comp) {
         JLabel label = new JLabel(title);
         titles.addComponent(label);
-        components.addComponent(comp, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE);
-        GroupLayout.ParallelGroup row = layout.createParallelGroup(GroupLayout.Alignment.BASELINE);
+        components.addComponent(comp);
+        GroupLayout.ParallelGroup row = layout.createParallelGroup(GroupLayout.Alignment.BASELINE, false);
         row.addComponent(label);
         row.addComponent(comp);
         vertical.addGroup(row);
