@@ -130,6 +130,8 @@ public class UI {
         log.getOutput().flush();
         log.getError().flush();
         panel.onProgress((failure == null ? "Finished" : "Failed") + " (" + timeMillis / 1000 + " seconds)");
+        commandLineArgs.requestFocusInWindow();
+        commandLineArgs.selectAll();
         initButtons();
     }
 
@@ -226,6 +228,7 @@ public class UI {
                 }
 
                 public void started() {
+                    panel.showConsole();
                 }
 
                 public JComponent getMainComponent() {

@@ -10,6 +10,7 @@ public class MainPanel extends JPanel {
     private final ConsolePanel console;
     private final ConsolePanel log;
     private final JTabbedPane tabs;
+    private int insertIndex = 1;
 
     public MainPanel() {
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
@@ -38,7 +39,8 @@ public class MainPanel extends JPanel {
     }
 
     public void addTab(String title, JComponent component) {
-        tabs.addTab(title, component);
+        tabs.insertTab(title, null, component, title, insertIndex);
+        insertIndex++;
     }
 
     public void addToolbarControl(AbstractButton button) {
@@ -56,6 +58,10 @@ public class MainPanel extends JPanel {
     public void addControl(String title, JComponent comp) {
         settings.add(new JLabel(title));
         settings.add(comp);
+    }
+
+    public void showConsole() {
+        tabs.setSelectedIndex(0);
     }
 
     public ConsolePanel getConsole() {
