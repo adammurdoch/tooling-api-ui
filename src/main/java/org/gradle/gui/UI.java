@@ -5,7 +5,10 @@ import org.gradle.gui.actions.MultiModel;
 import org.gradle.gui.actions.RunBuildAction;
 import org.gradle.gui.actions.RunBuildActionAction;
 import org.gradle.gui.visualizations.*;
-import org.gradle.tooling.*;
+import org.gradle.tooling.CancellationTokenSource;
+import org.gradle.tooling.GradleConnector;
+import org.gradle.tooling.LongRunningOperation;
+import org.gradle.tooling.ProjectConnection;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
 import org.gradle.tooling.model.build.BuildEnvironment;
 import org.gradle.tooling.model.eclipse.EclipseProject;
@@ -33,12 +36,15 @@ public class UI {
     private final JButton runBuild;
     private final List<VisualizationPanel<?>> panels;
     private final JButton cancel;
+    private final JButton shutdown;
     private final MainPanel panel;
     private final List<JButton> buttons;
     private final PathControl projectDirSelector;
     private final PathControl installation;
+    private final PathControl userHomeDir;
     private final JTextField commandLineArgs;
     private final JCheckBox embedded;
+    private final JCheckBox verboseLogging;
     private final ConsolePanel console;
     private final ConsolePanel log;
     private final AtomicReference<CancellationTokenSource> token = new AtomicReference<>();
@@ -70,8 +76,11 @@ public class UI {
         System.setErr(log.getError());
         projectDirSelector = new PathControl();
         installation = new PathControl();
+        userHomeDir = new PathControl();
         commandLineArgs = new JTextField();
-        embedded = new JCheckBox("Embedded");
+        embedded = new JCheckBox("Run build in-process (internal)");
+        verboseLogging = new JCheckBox("Verbose logging (internal)");
+        shutdown = new JButton("Shutdown tooling API");
         gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "2.1", "2.0", "1.12", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2"});
     }
 
@@ -89,7 +98,11 @@ public class UI {
         settings.addControl("Gradle version", gradleVersion);
         installation.setFile(new File("/Users/adam/gradle/current"));
         settings.addControl("Distribution", installation);
+        settings.addControl("User home directory", userHomeDir);
         settings.addControl(embedded);
+        settings.addControl(verboseLogging);
+        settings.addControl(shutdown);
+        shutdown.addActionListener(new ShutdownListener());
 
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
@@ -251,6 +264,7 @@ public class UI {
         }
 
         public void actionPerformed(ActionEvent actionEvent) {
+            final File userHome = userHomeDir.getFile();
             final File projectDir = projectDirSelector.getFile();
             final File distribution;
             final String version;
@@ -266,18 +280,18 @@ public class UI {
             }
 
             final boolean isEmbedded = embedded.isSelected();
+            final boolean isVerbose = verboseLogging.isSelected();
             final String[] commandLine = commandLineArgs.getText().trim().split("\\s+");
             final CancellationTokenSource tokenSource = DefaultGradleConnector.newCancellationTokenSource();
             token.set(tokenSource);
-            final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(), Arrays.asList(commandLine)) {
+            final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(),
+                    Arrays.asList(commandLine)) {
                 @Override
                 public void setup(LongRunningOperation operation) {
                     operation.withCancellationToken(tokenSource.token());
-                    operation.addProgressListener(new ProgressListener() {
-                        public void statusChanged(ProgressEvent event) {
-                            log.getOutput().println("[progress: " + event.getDescription() + "]");
-                            panel.onProgress(event.getDescription());
-                        }
+                    operation.addProgressListener(event -> {
+                        log.getOutput().println("[progress: " + event.getDescription() + "]");
+                        panel.onProgress(event.getDescription());
                     });
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());
@@ -297,6 +311,9 @@ public class UI {
                     T result = null;
                     try {
                         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
+                        if (userHome != null) {
+                            connector.useGradleUserHomeDir(userHome);
+                        }
                         if (distribution != null) {
                             if (distribution.isDirectory()) {
                                 connector.useInstallation(distribution);
@@ -310,13 +327,15 @@ public class UI {
                         if (isEmbedded) {
                             connector.embedded(true);
                         }
+                        if (isVerbose) {
+                            connector.setVerboseLogging(true);
+                        }
                         ProjectConnection connection = connector.forProjectDirectory(projectDir).connect();
                         try {
                             result = operation.run(connection, uiContext);
                         } finally {
                             connection.close();
                         }
-
                     } catch (Throwable t) {
                         log.getError().println("FAILED WITH EXCEPTION");
                         t.printStackTrace(log.getError());
@@ -347,6 +366,15 @@ public class UI {
             // TODO - do this in the background
             System.out.println("Cancelling...");
             token.get().cancel();
+        }
+    }
+
+    private class ShutdownListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            // TODO - do this in the background
+            System.out.println("Shutdown...");
+            DefaultGradleConnector.close();
         }
     }
 }
