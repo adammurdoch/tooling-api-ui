@@ -43,6 +43,7 @@ public class UI {
     private final PathControl installation;
     private final PathControl userHomeDir;
     private final JTextField commandLineArgs;
+    private final JCheckBox color;
     private final JCheckBox embedded;
     private final JCheckBox verboseLogging;
     private final ConsolePanel console;
@@ -78,6 +79,7 @@ public class UI {
         installation = new PathControl();
         userHomeDir = new PathControl();
         commandLineArgs = new JTextField();
+        color = new JCheckBox("Color output");
         embedded = new JCheckBox("Run build in-process (internal)");
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
@@ -99,6 +101,8 @@ public class UI {
         installation.setFile(new File("/Users/adam/gradle/current"));
         settings.addControl("Distribution", installation);
         settings.addControl("User home directory", userHomeDir);
+        color.setSelected(true);
+        settings.addControl(color);
         settings.addControl(embedded);
         settings.addControl(verboseLogging);
         settings.addControl(shutdown);
@@ -279,6 +283,7 @@ public class UI {
                 version = gradleVersion.getSelectedItem().toString();
             }
 
+            final boolean isColor = color.isSelected();
             final boolean isEmbedded = embedded.isSelected();
             final boolean isVerbose = verboseLogging.isSelected();
             final String[] commandLine = commandLineArgs.getText().trim().split("\\s+");
@@ -293,7 +298,7 @@ public class UI {
                         log.getOutput().println("[progress: " + event.getDescription() + "]");
                         panel.onProgress(event.getDescription());
                     });
-                    operation.setColorOutput(true);
+                    operation.setColorOutput(isColor);
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());
                     if (commandLine.length > 0) {
