@@ -1,10 +1,7 @@
 package org.gradle.gui;
 
 import javax.swing.*;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Document;
-import javax.swing.text.Style;
-import javax.swing.text.StyleConstants;
+import javax.swing.text.*;
 import java.awt.*;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -96,32 +93,28 @@ public class ConsolePanel extends JPanel {
                 colorScheme = color.colorScheme;
                 continue;
             }
-            if (event instanceof CursorBack) {
-                CursorBack cursorBack = (CursorBack) event;
-                cursorPos -= cursorBack.count;
-                continue;
-            }
 
             if (!hasOutput) {
                 output.setText("");
                 output.setEnabled(true);
                 hasOutput = true;
             }
+            if (event instanceof CursorBack) {
+                // TODO - handle moving back over end-of-line chars
+                CursorBack cursorBack = (CursorBack) event;
+                cursorPos -= cursorBack.count;
+                continue;
+            }
+
+            StyledDocument document = output.getStyledDocument();
 
             if (event instanceof EraseToEndOfLine) {
                 try {
-                    Document document = output.getDocument();
                     if (cursorPos == document.getLength()) {
                         continue;
                     }
-                    int nleft = document.getLength() - cursorPos;
-                    String search = document.getText(cursorPos, nleft);
-                    int pos = search.indexOf('\n');
-                    if (pos < 0) {
-                        document.remove(cursorPos, nleft);
-                    } else {
-                        document.remove(cursorPos, pos);
-                    }
+                    Element para = document.getParagraphElement(cursorPos);
+                    document.remove(cursorPos, Math.min(document.getLength(), para.getEndOffset()) - cursorPos);
                 } catch (BadLocationException e) {
                     throw new RuntimeException(e);
                 }
@@ -132,8 +125,6 @@ public class ConsolePanel extends JPanel {
 
             ColorScheme currentScheme = colorScheme != null ? colorScheme : text.colorScheme;
             Style style = bold ? currentScheme.getBold() : currentScheme.getNormal();
-
-            Document document = output.getDocument();
             try {
                 document.insertString(cursorPos, text.text, style);
             } catch (BadLocationException e) {
@@ -208,6 +199,17 @@ public class ConsolePanel extends JPanel {
         final int count;
 
         public CursorBack(int count) {
+            this.count = count;
+        }
+    }
+
+    private class CursorUp extends Event {
+    }
+
+    private class CursorForward extends Event {
+        final int count;
+
+        public CursorForward(int count) {
             this.count = count;
         }
     }
