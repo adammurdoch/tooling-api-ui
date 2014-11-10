@@ -13,7 +13,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ConsolePanel extends JPanel {
-    private final Style escape;
+    private final Style knownEscape;
+    private final Style unknownEscape;
     private boolean hasOutput;
     private final JTextPane output;
     private final PrintStream outputStream;
@@ -31,9 +32,12 @@ public class ConsolePanel extends JPanel {
         Style stdout = output.addStyle("stdout", null);
         Style stderr = output.addStyle("stderr", null);
         StyleConstants.setForeground(stderr, Color.RED);
-        escape = output.addStyle("escape", null);
-        StyleConstants.setForeground(escape, Color.WHITE);
-        StyleConstants.setBackground(escape, Color.RED);
+        unknownEscape = output.addStyle("unknownEscape", null);
+        StyleConstants.setForeground(unknownEscape, Color.WHITE);
+        StyleConstants.setBackground(unknownEscape, Color.RED);
+        knownEscape = output.addStyle("knownEscape", null);
+        StyleConstants.setForeground(knownEscape, Color.WHITE);
+        StyleConstants.setBackground(knownEscape, Color.BLUE);
         add(output, BorderLayout.CENTER);
 
         ByteConsumer stdoutSink = new RawByteConsumer(stdout);
@@ -159,8 +163,7 @@ public class ConsolePanel extends JPanel {
 
     private class AnsiByteConsumer implements ByteConsumer {
         private final ByteConsumer consumer;
-        private final byte[] currentSequence = new byte[256];
-        private int currentPos;
+        private final StringBuilder currentSequence = new StringBuilder();
         private State state = State.Normal;
 
         private AnsiByteConsumer(ByteConsumer consumer) {
@@ -172,14 +175,43 @@ public class ConsolePanel extends JPanel {
             while (buffer.hasMore()) {
                 switch (state) {
                     case LeftParen:
-                        if (buffer.peek() == '[') {
-                            onEvent(new TextEvent("ESC[", escape));
-                            buffer.consume();
+                        if (buffer.peek() != '[') {
+                            onEvent(new TextEvent("ESC", unknownEscape));
                             state = State.Normal;
                         } else {
-                            onEvent(new TextEvent("ESC", escape));
-                            state = State.Normal;
+                            buffer.consume();
+                            state = State.Param;
                         }
+                        break;
+                    case Param:
+                        byte nextDigit = buffer.peek();
+                        if (nextDigit < '0' || nextDigit > '9') {
+                            state = State.Code;
+                        } else {
+                            currentSequence.append((char) nextDigit);
+                            buffer.consume();
+                        }
+                        break;
+                    case Code:
+                        char next = (char) buffer.peek();
+                        buffer.consume();
+                        String string = currentSequence.toString();
+                        if (next == 'm' && string.equals("1")) {
+                            onEvent(new TextEvent("[BOLD]", knownEscape));
+                        } else if (next == 'm' && string.equals("22")) {
+                            onEvent(new TextEvent("[NORMAL]", knownEscape));
+                        } else if (next == 'D') {
+                            onEvent(new TextEvent("[BACK:" + string + "]", knownEscape));
+                        } else if (next == 'A') {
+                            onEvent(new TextEvent("[UP:" + string + "]", knownEscape));
+                        } else if (next == 'C') {
+                            onEvent(new TextEvent("[FORWARD:" + string + "]", knownEscape));
+                        } else if (next == 'K' && string.equals("0")) {
+                            onEvent(new TextEvent("[ERASE-TO-END-LINE]", knownEscape));
+                        } else {
+                            onEvent(new TextEvent("ESC[" + string + next, unknownEscape));
+                        }
+                        state = State.Normal;
                         break;
                     case Normal:
                         Buffer prefix = buffer.consumeToNext((byte) 27);
@@ -190,6 +222,7 @@ public class ConsolePanel extends JPanel {
                         consumer.consume(prefix);
                         state = State.LeftParen;
                         buffer.consume();
+                        currentSequence.setLength(0);
                         break;
                     default:
                         throw new IllegalStateException();
@@ -238,6 +271,16 @@ public class ConsolePanel extends JPanel {
                 }
             }
             return null;
+        }
+
+        public void empty() {
+            offset = 0;
+            length = 0;
+        }
+
+        public void append(byte value) {
+            buffer[offset + length] = value;
+            length++;
         }
     }
 }
