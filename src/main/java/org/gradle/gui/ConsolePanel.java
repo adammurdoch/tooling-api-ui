@@ -21,7 +21,7 @@ public class ConsolePanel extends JPanel {
     private final PrintStream errorStream;
     private final BlockingQueue<ConsolePanel.TextEvent> events = new LinkedBlockingQueue<>();
 
-    public ConsolePanel() {
+    public ConsolePanel(boolean ansiAware) {
         setLayout(new BorderLayout());
 
         output = new JTextPane();
@@ -34,8 +34,8 @@ public class ConsolePanel extends JPanel {
         StyleConstants.setForeground(stderr, Color.RED);
         add(output, BorderLayout.CENTER);
 
-        outputStream = new PrintStream(new ConsolePanel.OutputWriter(true), true);
-        errorStream = new PrintStream(new ConsolePanel.OutputWriter(false), true);
+        outputStream = new PrintStream(new ConsolePanel.OutputWriter(new RawByteConsumer(stdout)), true);
+        errorStream = new PrintStream(new ConsolePanel.OutputWriter(new RawByteConsumer(stderr)), true);
     }
 
     public PrintStream getOutput() {
@@ -46,6 +46,26 @@ public class ConsolePanel extends JPanel {
         return errorStream;
     }
 
+    private void doWriteOutput() {
+        while (true) {
+            ConsolePanel.TextEvent event = events.poll();
+            if (event == null) {
+                return;
+            }
+            if (!hasOutput) {
+                output.setText("");
+                output.setEnabled(true);
+                hasOutput = true;
+            }
+            Document document = output.getDocument();
+            try {
+                document.insertString(document.getLength(), event.text, event.style);
+            } catch (BadLocationException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     public void clearOutput() {
         output.setText("");
         hasOutput = false;
@@ -53,19 +73,19 @@ public class ConsolePanel extends JPanel {
 
     private class TextEvent {
         final String text;
-        final boolean stdout;
+        final Style style;
 
-        private TextEvent(String text, boolean stdout) {
+        private TextEvent(String text, Style style) {
             this.text = text;
-            this.stdout = stdout;
+            this.style = style;
         }
     }
 
     private class OutputWriter extends OutputStream {
-        private final boolean stdout;
+        private final ByteConsumer sink;
 
-        public OutputWriter(boolean stdout) {
-            this.stdout = stdout;
+        public OutputWriter(ByteConsumer sink) {
+            this.sink = sink;
         }
 
         @Override
@@ -82,37 +102,7 @@ public class ConsolePanel extends JPanel {
 
         @Override
         public void write(byte[] bytes, int offset, int length) throws IOException {
-            String text = new String(bytes, offset, length);
-            events.add(new ConsolePanel.TextEvent(text, stdout));
-            if (SwingUtilities.isEventDispatchThread()) {
-                doWriteOutput();
-            } else {
-                SwingUtilities.invokeLater(new Runnable() {
-                    public void run() {
-                        doWriteOutput();
-                    }
-                });
-            }
-        }
-
-        private void doWriteOutput() {
-            while (true) {
-                ConsolePanel.TextEvent event = events.poll();
-                if (event == null) {
-                    return;
-                }
-                if (!hasOutput) {
-                    output.setText("");
-                    output.setEnabled(true);
-                    hasOutput = true;
-                }
-                Document document = output.getDocument();
-                try {
-                    document.insertString(document.getLength(), event.text, event.stdout ? ConsolePanel.this.stdout : stderr);
-                } catch (BadLocationException e) {
-                    throw new RuntimeException(e);
-                }
-            }
+            sink.consume(bytes, offset, length);
         }
 
         @Override
@@ -121,6 +111,29 @@ public class ConsolePanel extends JPanel {
 
         @Override
         public void close() throws IOException {
+        }
+    }
+
+    private interface ByteConsumer {
+        void consume(byte[] buffer, int offset, int length);
+    }
+
+    private class RawByteConsumer implements ByteConsumer {
+        private final Style style;
+
+        public RawByteConsumer(Style style) {
+            this.style = style;
+        }
+
+        @Override
+        public void consume(byte[] bytes, int offset, int length) {
+            String text = new String(bytes, offset, length);
+            events.add(new ConsolePanel.TextEvent(text, style));
+            if (SwingUtilities.isEventDispatchThread()) {
+                doWriteOutput();
+            } else {
+                SwingUtilities.invokeLater(ConsolePanel.this::doWriteOutput);
+            }
         }
     }
 }

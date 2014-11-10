@@ -27,10 +27,10 @@ public class MainPanel extends JPanel {
         tabs = new JTabbedPane();
         add(tabs, BorderLayout.CENTER);
 
-        console = new ConsolePanel();
+        console = new ConsolePanel(true);
         tabs.addTab("Console", new JScrollPane(console));
 
-        log = new ConsolePanel();
+        log = new ConsolePanel(false);
         tabs.addTab("Log", new JScrollPane(log));
 
         settings = new SettingsPanel();
@@ -79,11 +79,7 @@ public class MainPanel extends JPanel {
             progress.setText(text);
         }
         else {
-            SwingUtilities.invokeLater(new Runnable() {
-                public void run() {
-                    progress.setText(text);
-                }
-            });
+            SwingUtilities.invokeLater(() -> progress.setText(text));
         }
     }
 }
