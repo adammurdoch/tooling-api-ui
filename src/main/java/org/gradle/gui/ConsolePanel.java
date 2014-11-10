@@ -40,8 +40,8 @@ public class ConsolePanel extends JPanel {
         StyleConstants.setBackground(knownEscape, new Color(80, 127, 180));
         add(output, BorderLayout.CENTER);
 
-        ByteConsumer stdoutSink = new RawByteConsumer(stdout);
-        ByteConsumer stderrSink = new RawByteConsumer(stderr);
+        ByteConsumer stdoutSink = new AnsiByteConsumer(new RawByteConsumer(stdout));
+        ByteConsumer stderrSink = new AnsiByteConsumer(new RawByteConsumer(stderr));
         if (ansiAware) {
             stdoutSink = new AnsiByteConsumer(stdoutSink);
             stderrSink = new AnsiByteConsumer(stderrSink);
@@ -185,7 +185,7 @@ public class ConsolePanel extends JPanel {
                         break;
                     case Param:
                         byte nextDigit = buffer.peek();
-                        if (nextDigit < '0' || nextDigit > '9') {
+                        if ((nextDigit < '0' || nextDigit > '9') && nextDigit != ';') {
                             state = State.Code;
                         } else {
                             currentSequence.append((char) nextDigit);
@@ -223,7 +223,11 @@ public class ConsolePanel extends JPanel {
                 onEvent(new TextEvent("[BOLD]", knownEscape));
                 return true;
             } else if (code == 'm' && pram.equals("22")) {
-                onEvent(new TextEvent("[NORMAL-INTENSITY]", knownEscape));
+                onEvent(new TextEvent("[NORMAL]", knownEscape));
+                return true;
+            } else if (code == 'm' && pram.equals("22;1")) {
+                onEvent(new TextEvent("[NORMAL]", knownEscape));
+                onEvent(new TextEvent("[BOLD]", knownEscape));
                 return true;
             } else if (code == 'm' && pram.equals("31")) {
                 onEvent(new TextEvent("[RED]", knownEscape));
@@ -235,7 +239,7 @@ public class ConsolePanel extends JPanel {
                 onEvent(new TextEvent("[YELLOW]", knownEscape));
                 return true;
             } else if (code == 'm' && pram.equals("39")) {
-                onEvent(new TextEvent("[NORMAL-COLOR]", knownEscape));
+                onEvent(new TextEvent("[NORMAL-FG]", knownEscape));
                 return true;
             } else if (code == 'D') {
                 onEvent(new TextEvent("[BACK:" + pram + "]", knownEscape));
