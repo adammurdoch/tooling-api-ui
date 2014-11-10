@@ -13,13 +13,14 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ConsolePanel extends JPanel {
-    private final Style knownEscape;
-    private final Style unknownEscape;
+    private final ColorScheme knownEscape;
+    private final ColorScheme unknownEscape;
     private boolean hasOutput;
     private final JTextPane output;
     private final PrintStream outputStream;
     private final PrintStream errorStream;
-    private final BlockingQueue<ConsolePanel.TextEvent> events = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Event> events = new LinkedBlockingQueue<>();
+    private boolean bold;
 
     public ConsolePanel(boolean ansiAware) {
         setLayout(new BorderLayout());
@@ -29,23 +30,26 @@ public class ConsolePanel extends JPanel {
         output.setEnabled(false);
         output.setFont(new Font("monospaced", Font.PLAIN, 13));
         output.setText("output goes here..");
+
         Style stdout = output.addStyle("stdout", null);
+
         Style stderr = output.addStyle("stderr", null);
         StyleConstants.setForeground(stderr, Color.RED);
-        unknownEscape = output.addStyle("unknownEscape", null);
+
+        Style unknownEscape = output.addStyle("unknownEscape", null);
         StyleConstants.setForeground(unknownEscape, Color.WHITE);
         StyleConstants.setBackground(unknownEscape, Color.RED);
-        knownEscape = output.addStyle("knownEscape", null);
+        this.unknownEscape = new NoBoldColorScheme(unknownEscape);
+
+        Style knownEscape = output.addStyle("knownEscape", null);
         StyleConstants.setForeground(knownEscape, Color.WHITE);
         StyleConstants.setBackground(knownEscape, new Color(80, 127, 180));
+        this.knownEscape = new NoBoldColorScheme(knownEscape);
+
         add(output, BorderLayout.CENTER);
 
-        ByteConsumer stdoutSink = new AnsiByteConsumer(new RawByteConsumer(stdout));
-        ByteConsumer stderrSink = new AnsiByteConsumer(new RawByteConsumer(stderr));
-        if (ansiAware) {
-            stdoutSink = new AnsiByteConsumer(stdoutSink);
-            stderrSink = new AnsiByteConsumer(stderrSink);
-        }
+        ByteConsumer stdoutSink = new AnsiByteConsumer(new BoldColorScheme(stdout, output));
+        ByteConsumer stderrSink = new AnsiByteConsumer(new BoldColorScheme(stderr, output));
 
         outputStream = new PrintStream(new ConsolePanel.OutputWriter(stdoutSink), true);
         errorStream = new PrintStream(new ConsolePanel.OutputWriter(stderrSink), true);
@@ -61,10 +65,20 @@ public class ConsolePanel extends JPanel {
 
     private void doWriteOutput() {
         while (true) {
-            ConsolePanel.TextEvent event = events.poll();
+            Event event = events.poll();
             if (event == null) {
                 return;
             }
+            if (event instanceof Bold) {
+                bold = true;
+                continue;
+            }
+            if (event instanceof Normal) {
+                bold = false;
+                continue;
+            }
+
+            TextEvent text = (TextEvent) event;
             if (!hasOutput) {
                 output.setText("");
                 output.setEnabled(true);
@@ -72,14 +86,14 @@ public class ConsolePanel extends JPanel {
             }
             Document document = output.getDocument();
             try {
-                document.insertString(document.getLength(), event.text, event.style);
+                document.insertString(document.getLength(), text.text, bold ? text.colorScheme.getBold() : text.colorScheme.getNormal());
             } catch (BadLocationException e) {
                 throw new RuntimeException(e);
             }
         }
     }
 
-    private void onEvent(TextEvent event) {
+    private void onEvent(Event event) {
         events.add(event);
         if (SwingUtilities.isEventDispatchThread()) {
             doWriteOutput();
@@ -93,16 +107,65 @@ public class ConsolePanel extends JPanel {
         hasOutput = false;
     }
 
+    private interface ColorScheme {
+        public Style getNormal();
+
+        public Style getBold();
+    }
+
+    private static class BoldColorScheme implements ColorScheme {
+        private final Style normal;
+        private final Style bold;
+
+        public BoldColorScheme(Style normal, JTextPane owner) {
+            this.normal = normal;
+            bold = owner.addStyle(normal.getName() + "Bold", normal);
+            StyleConstants.setBold(bold, true);
+        }
+
+        public Style getNormal() {
+            return normal;
+        }
+
+        public Style getBold() {
+            return bold;
+        }
+    }
+
+    private static class NoBoldColorScheme implements ColorScheme {
+        private final Style style;
+
+        public NoBoldColorScheme(Style style) {
+            this.style = style;
+        }
+
+        @Override
+        public Style getNormal() {
+            return style;
+        }
+
+        @Override
+        public Style getBold() {
+            return style;
+        }
+    }
+
     private abstract class Event {
+    }
+
+    private class Bold extends Event {
+    }
+
+    private class Normal extends Event {
     }
 
     private class TextEvent extends Event {
         final String text;
-        final Style style;
+        final ColorScheme colorScheme;
 
-        private TextEvent(String text, Style style) {
+        private TextEvent(String text, ColorScheme colorScheme) {
             this.text = text;
-            this.style = style;
+            this.colorScheme = colorScheme;
         }
     }
 
@@ -127,7 +190,9 @@ public class ConsolePanel extends JPanel {
 
         @Override
         public void write(byte[] bytes, int offset, int length) throws IOException {
-            sink.consume(new Buffer(bytes, offset, length));
+            synchronized (sink) {
+                sink.consume(new Buffer(bytes, offset, length));
+            }
         }
 
         @Override
@@ -143,31 +208,17 @@ public class ConsolePanel extends JPanel {
         void consume(Buffer buffer);
     }
 
-    private class RawByteConsumer implements ByteConsumer {
-        private final Style style;
-
-        public RawByteConsumer(Style style) {
-            this.style = style;
-        }
-
-        @Override
-        public void consume(Buffer buffer) {
-            String text = buffer.consumeString();
-            onEvent(new TextEvent(text, style));
-        }
-    }
-
     enum State {
         Normal, LeftParen, Param, Code
     }
 
     private class AnsiByteConsumer implements ByteConsumer {
-        private final ByteConsumer consumer;
         private final StringBuilder currentSequence = new StringBuilder();
+        private final ColorScheme colorScheme;
         private State state = State.Normal;
 
-        private AnsiByteConsumer(ByteConsumer consumer) {
-            this.consumer = consumer;
+        public AnsiByteConsumer(ColorScheme colorScheme) {
+            this.colorScheme = colorScheme;
         }
 
         @Override
@@ -204,10 +255,10 @@ public class ConsolePanel extends JPanel {
                     case Normal:
                         Buffer prefix = buffer.consumeToNext((byte) 27);
                         if (prefix == null) {
-                            consumer.consume(buffer);
+                            onEvent(new TextEvent(buffer.consumeString(), colorScheme));
                             return;
                         }
-                        consumer.consume(prefix);
+                        onEvent(new TextEvent(prefix.consumeString(), colorScheme));
                         state = State.LeftParen;
                         buffer.consume();
                         currentSequence.setLength(0);
@@ -220,14 +271,14 @@ public class ConsolePanel extends JPanel {
 
         private boolean handleEscape(String pram, char code) {
             if (code == 'm' && pram.equals("1")) {
-                onEvent(new TextEvent("[BOLD]", knownEscape));
+                onEvent(new Bold());
                 return true;
             } else if (code == 'm' && pram.equals("22")) {
-                onEvent(new TextEvent("[NORMAL]", knownEscape));
+                onEvent(new Normal());
                 return true;
             } else if (code == 'm' && pram.equals("22;1")) {
-                onEvent(new TextEvent("[NORMAL]", knownEscape));
-                onEvent(new TextEvent("[BOLD]", knownEscape));
+                onEvent(new Normal());
+                onEvent(new Bold());
                 return true;
             } else if (code == 'm' && pram.equals("31")) {
                 onEvent(new TextEvent("[RED]", knownEscape));
