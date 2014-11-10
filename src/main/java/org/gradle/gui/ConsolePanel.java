@@ -25,6 +25,7 @@ public class ConsolePanel extends JPanel {
     private final BlockingQueue<Event> events = new LinkedBlockingQueue<>();
     private ColorScheme colorScheme;
     private boolean bold;
+    private int cursorPos;
 
     public ConsolePanel(boolean ansiAware) {
         setLayout(new BorderLayout());
@@ -95,23 +96,50 @@ public class ConsolePanel extends JPanel {
                 colorScheme = color.colorScheme;
                 continue;
             }
+            if (event instanceof CursorBack) {
+                CursorBack cursorBack = (CursorBack) event;
+                cursorPos -= cursorBack.count;
+                continue;
+            }
 
-            TextEvent text = (TextEvent) event;
             if (!hasOutput) {
                 output.setText("");
                 output.setEnabled(true);
                 hasOutput = true;
             }
 
+            if (event instanceof EraseToEndOfLine) {
+                try {
+                    Document document = output.getDocument();
+                    if (cursorPos == document.getLength()) {
+                        continue;
+                    }
+                    int nleft = document.getLength() - cursorPos;
+                    String search = document.getText(cursorPos, nleft);
+                    int pos = search.indexOf('\n');
+                    if (pos < 0) {
+                        document.remove(cursorPos, nleft);
+                    } else {
+                        document.remove(cursorPos, pos);
+                    }
+                } catch (BadLocationException e) {
+                    throw new RuntimeException(e);
+                }
+                continue;
+            }
+
+            TextEvent text = (TextEvent) event;
+
             ColorScheme currentScheme = colorScheme != null ? colorScheme : text.colorScheme;
             Style style = bold ? currentScheme.getBold() : currentScheme.getNormal();
 
             Document document = output.getDocument();
             try {
-                document.insertString(document.getLength(), text.text, style);
+                document.insertString(cursorPos, text.text, style);
             } catch (BadLocationException e) {
                 throw new RuntimeException(e);
             }
+            cursorPos += text.text.length();
         }
     }
 
@@ -126,6 +154,7 @@ public class ConsolePanel extends JPanel {
 
     public void clearOutput() {
         output.setText("");
+        cursorPos = 0;
         hasOutput = false;
     }
 
@@ -173,6 +202,17 @@ public class ConsolePanel extends JPanel {
     }
 
     private abstract class Event {
+    }
+
+    private class CursorBack extends Event {
+        final int count;
+
+        public CursorBack(int count) {
+            this.count = count;
+        }
+    }
+
+    private class EraseToEndOfLine extends Event {
     }
 
     private class Bold extends Event {
@@ -299,40 +339,40 @@ public class ConsolePanel extends JPanel {
             }
         }
 
-        private boolean handleEscape(String pram, char code) {
-            if (code == 'm' && pram.equals("1")) {
+        private boolean handleEscape(String param, char code) {
+            if (code == 'm' && param.equals("1")) {
                 onEvent(new Bold());
                 return true;
-            } else if (code == 'm' && pram.equals("22")) {
+            } else if (code == 'm' && param.equals("22")) {
                 onEvent(new Normal());
                 return true;
-            } else if (code == 'm' && pram.equals("22;1")) {
+            } else if (code == 'm' && param.equals("22;1")) {
                 onEvent(new Normal());
                 onEvent(new Bold());
                 return true;
-            } else if (code == 'm' && pram.equals("31")) {
+            } else if (code == 'm' && param.equals("31")) {
                 onEvent(new ForegroundColor(ansiRed));
                 return true;
-            } else if (code == 'm' && pram.equals("32")) {
+            } else if (code == 'm' && param.equals("32")) {
                 onEvent(new ForegroundColor(ansiGreen));
                 return true;
-            } else if (code == 'm' && pram.equals("33")) {
+            } else if (code == 'm' && param.equals("33")) {
                 onEvent(new ForegroundColor(ansiYellow));
                 return true;
-            } else if (code == 'm' && pram.equals("39")) {
+            } else if (code == 'm' && param.equals("39")) {
                 onEvent(new ForegroundColor(null));
                 return true;
             } else if (code == 'D') {
-                onEvent(new TextEvent("[BACK:" + pram + "]", knownEscape));
+                onEvent(new CursorBack(Integer.parseInt(param)));
                 return true;
             } else if (code == 'A') {
-                onEvent(new TextEvent("[UP:" + pram + "]", knownEscape));
+                onEvent(new TextEvent("[UP:" + param + "]", knownEscape));
                 return true;
             } else if (code == 'C') {
-                onEvent(new TextEvent("[FORWARD:" + pram + "]", knownEscape));
+                onEvent(new TextEvent("[FORWARD:" + param + "]", knownEscape));
                 return true;
-            } else if (code == 'K' && pram.equals("0")) {
-                onEvent(new TextEvent("[ERASE-TO-END-LINE]", knownEscape));
+            } else if (code == 'K' && param.equals("0")) {
+                onEvent(new EraseToEndOfLine());
                 return true;
             }
             return false;
