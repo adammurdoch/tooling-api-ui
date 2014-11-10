@@ -37,7 +37,7 @@ public class ConsolePanel extends JPanel {
         StyleConstants.setBackground(unknownEscape, Color.RED);
         knownEscape = output.addStyle("knownEscape", null);
         StyleConstants.setForeground(knownEscape, Color.WHITE);
-        StyleConstants.setBackground(knownEscape, Color.BLUE);
+        StyleConstants.setBackground(knownEscape, new Color(80, 127, 180));
         add(output, BorderLayout.CENTER);
 
         ByteConsumer stdoutSink = new RawByteConsumer(stdout);
@@ -196,19 +196,7 @@ public class ConsolePanel extends JPanel {
                         char next = (char) buffer.peek();
                         buffer.consume();
                         String string = currentSequence.toString();
-                        if (next == 'm' && string.equals("1")) {
-                            onEvent(new TextEvent("[BOLD]", knownEscape));
-                        } else if (next == 'm' && string.equals("22")) {
-                            onEvent(new TextEvent("[NORMAL]", knownEscape));
-                        } else if (next == 'D') {
-                            onEvent(new TextEvent("[BACK:" + string + "]", knownEscape));
-                        } else if (next == 'A') {
-                            onEvent(new TextEvent("[UP:" + string + "]", knownEscape));
-                        } else if (next == 'C') {
-                            onEvent(new TextEvent("[FORWARD:" + string + "]", knownEscape));
-                        } else if (next == 'K' && string.equals("0")) {
-                            onEvent(new TextEvent("[ERASE-TO-END-LINE]", knownEscape));
-                        } else {
+                        if (!handleEscape(string, next)) {
                             onEvent(new TextEvent("ESC[" + string + next, unknownEscape));
                         }
                         state = State.Normal;
@@ -228,6 +216,41 @@ public class ConsolePanel extends JPanel {
                         throw new IllegalStateException();
                 }
             }
+        }
+
+        private boolean handleEscape(String pram, char code) {
+            if (code == 'm' && pram.equals("1")) {
+                onEvent(new TextEvent("[BOLD]", knownEscape));
+                return true;
+            } else if (code == 'm' && pram.equals("22")) {
+                onEvent(new TextEvent("[NORMAL-INTENSITY]", knownEscape));
+                return true;
+            } else if (code == 'm' && pram.equals("31")) {
+                onEvent(new TextEvent("[RED]", knownEscape));
+                return true;
+            } else if (code == 'm' && pram.equals("32")) {
+                onEvent(new TextEvent("[GREEN]", knownEscape));
+                return true;
+            } else if (code == 'm' && pram.equals("33")) {
+                onEvent(new TextEvent("[YELLOW]", knownEscape));
+                return true;
+            } else if (code == 'm' && pram.equals("39")) {
+                onEvent(new TextEvent("[NORMAL-COLOR]", knownEscape));
+                return true;
+            } else if (code == 'D') {
+                onEvent(new TextEvent("[BACK:" + pram + "]", knownEscape));
+                return true;
+            } else if (code == 'A') {
+                onEvent(new TextEvent("[UP:" + pram + "]", knownEscape));
+                return true;
+            } else if (code == 'C') {
+                onEvent(new TextEvent("[FORWARD:" + pram + "]", knownEscape));
+                return true;
+            } else if (code == 'K' && pram.equals("0")) {
+                onEvent(new TextEvent("[ERASE-TO-END-LINE]", knownEscape));
+                return true;
+            }
+            return false;
         }
     }
 
@@ -271,16 +294,6 @@ public class ConsolePanel extends JPanel {
                 }
             }
             return null;
-        }
-
-        public void empty() {
-            offset = 0;
-            length = 0;
-        }
-
-        public void append(byte value) {
-            buffer[offset + length] = value;
-            length++;
         }
     }
 }
