@@ -282,7 +282,7 @@ public class UI {
             final boolean isEmbedded = embedded.isSelected();
             final boolean isVerbose = verboseLogging.isSelected();
             final String[] commandLine = commandLineArgs.getText().trim().split("\\s+");
-            final CancellationTokenSource tokenSource = DefaultGradleConnector.newCancellationTokenSource();
+            final CancellationTokenSource tokenSource = GradleConnector.newCancellationTokenSource();
             token.set(tokenSource);
             final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(),
                     Arrays.asList(commandLine)) {
@@ -293,6 +293,7 @@ public class UI {
                         log.getOutput().println("[progress: " + event.getDescription() + "]");
                         panel.onProgress(event.getDescription());
                     });
+                    operation.setColorOutput(true);
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());
                     if (commandLine.length > 0) {
@@ -344,14 +345,12 @@ public class UI {
                         final long endTime = System.currentTimeMillis();
                         final Throwable finalFailure = failure;
                         final T finalResult = result;
-                        SwingUtilities.invokeLater(new Runnable() {
-                            public void run() {
-                                onFinishOperation(endTime - startTime, finalFailure);
-                                if (finalResult != null) {
-                                    visualization.update(finalResult);
-                                } else {
-                                    visualization.failed();
-                                }
+                        SwingUtilities.invokeLater(() -> {
+                            onFinishOperation(endTime - startTime, finalFailure);
+                            if (finalResult != null) {
+                                visualization.update(finalResult);
+                            } else {
+                                visualization.failed();
                             }
                         });
                     }
