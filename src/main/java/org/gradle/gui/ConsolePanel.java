@@ -13,8 +13,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ConsolePanel extends JPanel {
-    private final Style stdout;
-    private final Style stderr;
+    private final Style escape;
     private boolean hasOutput;
     private final JTextPane output;
     private final PrintStream outputStream;
@@ -29,13 +28,23 @@ public class ConsolePanel extends JPanel {
         output.setEnabled(false);
         output.setFont(new Font("monospaced", Font.PLAIN, 13));
         output.setText("output goes here..");
-        stdout = output.addStyle("stdout", null);
-        stderr = output.addStyle("stderr", null);
+        Style stdout = output.addStyle("stdout", null);
+        Style stderr = output.addStyle("stderr", null);
         StyleConstants.setForeground(stderr, Color.RED);
+        escape = output.addStyle("escape", null);
+        StyleConstants.setForeground(escape, Color.WHITE);
+        StyleConstants.setBackground(escape, Color.RED);
         add(output, BorderLayout.CENTER);
 
-        outputStream = new PrintStream(new ConsolePanel.OutputWriter(new RawByteConsumer(stdout)), true);
-        errorStream = new PrintStream(new ConsolePanel.OutputWriter(new RawByteConsumer(stderr)), true);
+        ByteConsumer stdoutSink = new RawByteConsumer(stdout);
+        ByteConsumer stderrSink = new RawByteConsumer(stderr);
+        if (ansiAware) {
+            stdoutSink = new AnsiByteConsumer(stdoutSink);
+            stderrSink = new AnsiByteConsumer(stderrSink);
+        }
+
+        outputStream = new PrintStream(new ConsolePanel.OutputWriter(stdoutSink), true);
+        errorStream = new PrintStream(new ConsolePanel.OutputWriter(stderrSink), true);
     }
 
     public PrintStream getOutput() {
@@ -66,12 +75,24 @@ public class ConsolePanel extends JPanel {
         }
     }
 
+    private void onEvent(TextEvent event) {
+        events.add(event);
+        if (SwingUtilities.isEventDispatchThread()) {
+            doWriteOutput();
+        } else {
+            SwingUtilities.invokeLater(this::doWriteOutput);
+        }
+    }
+
     public void clearOutput() {
         output.setText("");
         hasOutput = false;
     }
 
-    private class TextEvent {
+    private abstract class Event {
+    }
+
+    private class TextEvent extends Event {
         final String text;
         final Style style;
 
@@ -128,11 +149,35 @@ public class ConsolePanel extends JPanel {
         @Override
         public void consume(byte[] bytes, int offset, int length) {
             String text = new String(bytes, offset, length);
-            events.add(new ConsolePanel.TextEvent(text, style));
-            if (SwingUtilities.isEventDispatchThread()) {
-                doWriteOutput();
-            } else {
-                SwingUtilities.invokeLater(ConsolePanel.this::doWriteOutput);
+            onEvent(new TextEvent(text, style));
+        }
+    }
+
+    private class AnsiByteConsumer implements ByteConsumer {
+        private final ByteConsumer consumer;
+        private final byte[] currentSequence = new byte[256];
+        private int currentPos;
+
+        private AnsiByteConsumer(ByteConsumer consumer) {
+            this.consumer = consumer;
+        }
+
+        @Override
+        public void consume(byte[] bytes, int offset, int length) {
+            while (length > 0) {
+                int maxOffset = offset + length;
+                int nextEscape = offset;
+                for (; nextEscape < maxOffset && bytes[nextEscape] != 27; nextEscape++) {
+                }
+                if (nextEscape == maxOffset) {
+                    consumer.consume(bytes, offset, length);
+                    return;
+                }
+                int count = nextEscape - offset;
+                consumer.consume(bytes, offset, count);
+                onEvent(new TextEvent("ESC", escape));
+                offset = nextEscape + 1;
+                length = length - count - 1;
             }
         }
     }
