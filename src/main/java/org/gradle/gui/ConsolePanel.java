@@ -123,7 +123,7 @@ public class ConsolePanel extends JPanel {
 
         @Override
         public void write(byte[] bytes, int offset, int length) throws IOException {
-            sink.consume(bytes, offset, length);
+            sink.consume(new Buffer(bytes, offset, length));
         }
 
         @Override
@@ -136,7 +136,7 @@ public class ConsolePanel extends JPanel {
     }
 
     private interface ByteConsumer {
-        void consume(byte[] buffer, int offset, int length);
+        void consume(Buffer buffer);
     }
 
     private class RawByteConsumer implements ByteConsumer {
@@ -147,38 +147,97 @@ public class ConsolePanel extends JPanel {
         }
 
         @Override
-        public void consume(byte[] bytes, int offset, int length) {
-            String text = new String(bytes, offset, length);
+        public void consume(Buffer buffer) {
+            String text = buffer.consumeString();
             onEvent(new TextEvent(text, style));
         }
+    }
+
+    enum State {
+        Normal, LeftParen, Param, Code
     }
 
     private class AnsiByteConsumer implements ByteConsumer {
         private final ByteConsumer consumer;
         private final byte[] currentSequence = new byte[256];
         private int currentPos;
+        private State state = State.Normal;
 
         private AnsiByteConsumer(ByteConsumer consumer) {
             this.consumer = consumer;
         }
 
         @Override
-        public void consume(byte[] bytes, int offset, int length) {
-            while (length > 0) {
-                int maxOffset = offset + length;
-                int nextEscape = offset;
-                for (; nextEscape < maxOffset && bytes[nextEscape] != 27; nextEscape++) {
+        public void consume(Buffer buffer) {
+            while (buffer.hasMore()) {
+                switch (state) {
+                    case LeftParen:
+                        if (buffer.peek() == '[') {
+                            onEvent(new TextEvent("ESC[", escape));
+                            buffer.consume();
+                            state = State.Normal;
+                        } else {
+                            onEvent(new TextEvent("ESC", escape));
+                            state = State.Normal;
+                        }
+                        break;
+                    case Normal:
+                        Buffer prefix = buffer.consumeToNext((byte) 27);
+                        if (prefix == null) {
+                            consumer.consume(buffer);
+                            return;
+                        }
+                        consumer.consume(prefix);
+                        state = State.LeftParen;
+                        buffer.consume();
+                        break;
+                    default:
+                        throw new IllegalStateException();
                 }
-                if (nextEscape == maxOffset) {
-                    consumer.consume(bytes, offset, length);
-                    return;
-                }
-                int count = nextEscape - offset;
-                consumer.consume(bytes, offset, count);
-                onEvent(new TextEvent("ESC", escape));
-                offset = nextEscape + 1;
-                length = length - count - 1;
             }
+        }
+    }
+
+    private static class Buffer {
+        private final byte[] buffer;
+        private int offset;
+        private int length;
+
+        public Buffer(byte[] buffer, int offset, int length) {
+            this.buffer = buffer;
+            this.offset = offset;
+            this.length = length;
+        }
+
+        public String consumeString() {
+            return new String(buffer, offset, length);
+        }
+
+        public byte peek() {
+            return buffer[offset];
+        }
+
+        public void consume() {
+            offset++;
+            length--;
+        }
+
+        public boolean hasMore() {
+            return length > 0;
+        }
+
+        public Buffer consumeToNext(byte value) {
+            int maxOffset = offset + length;
+            for (int nextValue = offset; nextValue < maxOffset; nextValue++) {
+                if (buffer[nextValue] == value) {
+                    int count = nextValue - offset;
+                    Buffer result = new Buffer(buffer, offset, count);
+                    offset = nextValue;
+                    length -= count;
+                    return result;
+                }
+            }
+            return null;
         }
     }
 }
