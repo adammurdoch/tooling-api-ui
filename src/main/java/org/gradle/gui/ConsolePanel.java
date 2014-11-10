@@ -15,11 +15,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class ConsolePanel extends JPanel {
     private final ColorScheme knownEscape;
     private final ColorScheme unknownEscape;
+    private final ColorScheme ansiRed;
+    private final ColorScheme ansiGreen;
+    private final ColorScheme ansiYellow;
     private boolean hasOutput;
     private final JTextPane output;
     private final PrintStream outputStream;
     private final PrintStream errorStream;
     private final BlockingQueue<Event> events = new LinkedBlockingQueue<>();
+    private ColorScheme colorScheme;
     private boolean bold;
 
     public ConsolePanel(boolean ansiAware) {
@@ -33,8 +37,17 @@ public class ConsolePanel extends JPanel {
 
         Style stdout = output.addStyle("stdout", null);
 
-        Style stderr = output.addStyle("stderr", null);
-        StyleConstants.setForeground(stderr, Color.RED);
+        Style red = output.addStyle("ansiRed", null);
+        StyleConstants.setForeground(red, Color.RED);
+        this.ansiRed = new BoldColorScheme(red, output);
+
+        Style yellow = output.addStyle("ansiYellow", null);
+        StyleConstants.setForeground(yellow, new Color(200, 200, 20));
+        this.ansiYellow = new BoldColorScheme(yellow, output);
+
+        Style green = output.addStyle("ansiGreen", null);
+        StyleConstants.setForeground(green, new Color(20, 200, 20));
+        this.ansiGreen = new BoldColorScheme(green, output);
 
         Style unknownEscape = output.addStyle("unknownEscape", null);
         StyleConstants.setForeground(unknownEscape, Color.WHITE);
@@ -49,7 +62,7 @@ public class ConsolePanel extends JPanel {
         add(output, BorderLayout.CENTER);
 
         ByteConsumer stdoutSink = new AnsiByteConsumer(new BoldColorScheme(stdout, output));
-        ByteConsumer stderrSink = new AnsiByteConsumer(new BoldColorScheme(stderr, output));
+        ByteConsumer stderrSink = new AnsiByteConsumer(ansiRed);
 
         outputStream = new PrintStream(new ConsolePanel.OutputWriter(stdoutSink), true);
         errorStream = new PrintStream(new ConsolePanel.OutputWriter(stderrSink), true);
@@ -77,6 +90,11 @@ public class ConsolePanel extends JPanel {
                 bold = false;
                 continue;
             }
+            if (event instanceof ForegroundColor) {
+                ForegroundColor color = (ForegroundColor) event;
+                colorScheme = color.colorScheme;
+                continue;
+            }
 
             TextEvent text = (TextEvent) event;
             if (!hasOutput) {
@@ -84,9 +102,13 @@ public class ConsolePanel extends JPanel {
                 output.setEnabled(true);
                 hasOutput = true;
             }
+
+            ColorScheme currentScheme = colorScheme != null ? colorScheme : text.colorScheme;
+            Style style = bold ? currentScheme.getBold() : currentScheme.getNormal();
+
             Document document = output.getDocument();
             try {
-                document.insertString(document.getLength(), text.text, bold ? text.colorScheme.getBold() : text.colorScheme.getNormal());
+                document.insertString(document.getLength(), text.text, style);
             } catch (BadLocationException e) {
                 throw new RuntimeException(e);
             }
@@ -157,6 +179,14 @@ public class ConsolePanel extends JPanel {
     }
 
     private class Normal extends Event {
+    }
+
+    private class ForegroundColor extends Event {
+        final ColorScheme colorScheme;
+
+        public ForegroundColor(ColorScheme colorScheme) {
+            this.colorScheme = colorScheme;
+        }
     }
 
     private class TextEvent extends Event {
@@ -281,16 +311,16 @@ public class ConsolePanel extends JPanel {
                 onEvent(new Bold());
                 return true;
             } else if (code == 'm' && pram.equals("31")) {
-                onEvent(new TextEvent("[RED]", knownEscape));
+                onEvent(new ForegroundColor(ansiRed));
                 return true;
             } else if (code == 'm' && pram.equals("32")) {
-                onEvent(new TextEvent("[GREEN]", knownEscape));
+                onEvent(new ForegroundColor(ansiGreen));
                 return true;
             } else if (code == 'm' && pram.equals("33")) {
-                onEvent(new TextEvent("[YELLOW]", knownEscape));
+                onEvent(new ForegroundColor(ansiYellow));
                 return true;
             } else if (code == 'm' && pram.equals("39")) {
-                onEvent(new TextEvent("[NORMAL-FG]", knownEscape));
+                onEvent(new ForegroundColor(null));
                 return true;
             } else if (code == 'D') {
                 onEvent(new TextEvent("[BACK:" + pram + "]", knownEscape));
