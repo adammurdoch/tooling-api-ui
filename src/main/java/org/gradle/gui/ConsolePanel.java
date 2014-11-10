@@ -99,14 +99,31 @@ public class ConsolePanel extends JPanel {
                 output.setEnabled(true);
                 hasOutput = true;
             }
+
+            StyledDocument document = output.getStyledDocument();
+
             if (event instanceof CursorBack) {
                 // TODO - handle moving back over end-of-line chars
                 CursorBack cursorBack = (CursorBack) event;
-                cursorPos -= cursorBack.count;
+                Element para = document.getParagraphElement(cursorPos);
+                cursorPos = Math.max(para.getStartOffset(), cursorPos - cursorBack.count);
                 continue;
             }
 
-            StyledDocument document = output.getStyledDocument();
+            if (event instanceof CursorForward) {
+                // TODO - handle moving forward over end-of-line chars
+                CursorForward cursorForward = (CursorForward) event;
+                Element para = document.getParagraphElement(cursorPos);
+                cursorPos += cursorForward.count;
+                while (cursorPos >= para.getEndOffset()) {
+                    try {
+                        document.insertString(para.getEndOffset() - 1, " ", null);
+                    } catch (BadLocationException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                continue;
+            }
 
             if (event instanceof EraseToEndOfLine) {
                 try {
@@ -371,7 +388,7 @@ public class ConsolePanel extends JPanel {
                 onEvent(new TextEvent("[UP:" + param + "]", knownEscape));
                 return true;
             } else if (code == 'C') {
-                onEvent(new TextEvent("[FORWARD:" + param + "]", knownEscape));
+                onEvent(new CursorForward(Integer.parseInt(param)));
                 return true;
             } else if (code == 'K' && param.equals("0")) {
                 onEvent(new EraseToEndOfLine());
