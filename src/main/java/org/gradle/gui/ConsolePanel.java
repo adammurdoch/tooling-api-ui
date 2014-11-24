@@ -153,6 +153,7 @@ public class ConsolePanel extends JPanel {
             ColorScheme currentScheme = colorScheme != null ? colorScheme : text.colorScheme;
             Style style = bold ? currentScheme.getBold() : currentScheme.getNormal();
             try {
+                // TODO - need to overwrite existing text on the current line
                 document.insertString(cursorPos, text.text, style);
             } catch (BadLocationException e) {
                 throw new RuntimeException(e);
