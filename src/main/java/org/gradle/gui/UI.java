@@ -83,7 +83,7 @@ public class UI {
         embedded = new JCheckBox("Run build in-process (internal)");
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
-        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "2.1", "2.0", "1.12", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2"});
+        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "2.2.1-rc-1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
     }
 
     public static void main(String[] args) {
