@@ -1,4 +1,4 @@
-package org.gradle.gui;
+package net.rubygrapefruit.gradle.gui;
 
 /**
  * All methods are called from the Swing UI thread.

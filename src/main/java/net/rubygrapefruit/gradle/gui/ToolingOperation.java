@@ -1,4 +1,4 @@
-package org.gradle.gui;
+package net.rubygrapefruit.gradle.gui;
 
 import org.gradle.tooling.ProjectConnection;
 

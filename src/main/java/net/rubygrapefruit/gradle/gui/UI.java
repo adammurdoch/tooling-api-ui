@@ -1,10 +1,10 @@
-package org.gradle.gui;
+package net.rubygrapefruit.gradle.gui;
 
-import org.gradle.gui.actions.FetchModel;
-import org.gradle.gui.actions.MultiModel;
-import org.gradle.gui.actions.RunBuildAction;
-import org.gradle.gui.actions.RunBuildActionAction;
-import org.gradle.gui.visualizations.*;
+import net.rubygrapefruit.gradle.gui.actions.FetchModel;
+import net.rubygrapefruit.gradle.gui.actions.RunBuildActionAction;
+import net.rubygrapefruit.gradle.gui.visualizations.*;
+import net.rubygrapefruit.gradle.gui.actions.MultiModel;
+import net.rubygrapefruit.gradle.gui.actions.RunBuildAction;
 import org.gradle.tooling.CancellationTokenSource;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.LongRunningOperation;

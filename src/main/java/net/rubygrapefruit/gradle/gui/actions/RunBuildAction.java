@@ -1,7 +1,7 @@
-package org.gradle.gui.actions;
+package net.rubygrapefruit.gradle.gui.actions;
 
-import org.gradle.gui.ToolingOperation;
-import org.gradle.gui.UIContext;
+import net.rubygrapefruit.gradle.gui.ToolingOperation;
+import net.rubygrapefruit.gradle.gui.UIContext;
 import org.gradle.tooling.BuildLauncher;
 import org.gradle.tooling.ProjectConnection;
 

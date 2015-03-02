@@ -1,4 +1,4 @@
-package org.gradle.gui.actions;
+package net.rubygrapefruit.gradle.gui.actions;
 
 import org.gradle.tooling.model.GradleProject;
 import org.gradle.tooling.model.eclipse.EclipseProject;

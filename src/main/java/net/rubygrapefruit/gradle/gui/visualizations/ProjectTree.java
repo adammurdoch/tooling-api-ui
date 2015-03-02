@@ -1,6 +1,6 @@
-package org.gradle.gui.visualizations;
+package net.rubygrapefruit.gradle.gui.visualizations;
 
-import org.gradle.gui.Visualization;
+import net.rubygrapefruit.gradle.gui.Visualization;
 import org.gradle.tooling.model.gradle.BasicGradleProject;
 import org.gradle.tooling.model.gradle.GradleBuild;
 

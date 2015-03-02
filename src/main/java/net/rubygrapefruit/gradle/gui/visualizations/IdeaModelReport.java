@@ -1,4 +1,4 @@
-package org.gradle.gui.visualizations;
+package net.rubygrapefruit.gradle.gui.visualizations;
 
 import org.gradle.tooling.model.idea.IdeaDependency;
 import org.gradle.tooling.model.idea.IdeaModule;

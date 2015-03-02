@@ -1,6 +1,6 @@
-package org.gradle.gui.visualizations;
+package net.rubygrapefruit.gradle.gui.visualizations;
 
-import org.gradle.gui.Visualization;
+import net.rubygrapefruit.gradle.gui.Visualization;
 
 import javax.swing.*;
 import java.awt.*;

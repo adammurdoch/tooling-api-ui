@@ -1,6 +1,6 @@
-package org.gradle.gui.visualizations;
+package net.rubygrapefruit.gradle.gui.visualizations;
 
-import org.gradle.gui.actions.MultiModel;
+import net.rubygrapefruit.gradle.gui.actions.MultiModel;
 import org.gradle.tooling.model.GradleProject;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.idea.IdeaProject;
