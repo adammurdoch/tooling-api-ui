@@ -13,7 +13,7 @@ public class MainPanel extends JPanel {
     private final ConsolePanel log;
     private final JTabbedPane tabs;
     private final Map<String, Integer> tabTitles = new HashMap<>();
-    private int insertIndex = 1;
+    private int insertIndex;
 
     public MainPanel() {
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
@@ -27,14 +27,16 @@ public class MainPanel extends JPanel {
         tabs = new JTabbedPane();
         add(tabs, BorderLayout.CENTER);
 
+        settings = new SettingsPanel();
+        tabs.addTab("Settings", settings);
+
         console = new ConsolePanel(true);
         tabs.addTab("Console", new JScrollPane(console));
 
         log = new ConsolePanel(false);
         tabs.addTab("Log", new JScrollPane(log));
 
-        settings = new SettingsPanel();
-        tabs.addTab("Settings", settings);
+        insertIndex = 3;
 
         progress = new JLabel();
         add(progress, BorderLayout.SOUTH);
