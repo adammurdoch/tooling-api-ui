@@ -43,6 +43,7 @@ public class UI {
     private final PathControl installation;
     private final PathControl userHomeDir;
     private final JTextField commandLineArgs;
+    private final JTextField jvmArgs;
     private final JCheckBox color;
     private final JCheckBox embedded;
     private final JCheckBox verboseLogging;
@@ -79,11 +80,12 @@ public class UI {
         installation = new PathControl();
         userHomeDir = new PathControl();
         commandLineArgs = new JTextField();
+        jvmArgs = new JTextField();
         color = new JCheckBox("Color output");
         embedded = new JCheckBox("Run build in-process (internal)");
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
-        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "2.2.1-rc-1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
+        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
     }
 
     public static void main(String[] args) {
@@ -100,6 +102,7 @@ public class UI {
         settings.addControl("Gradle version", gradleVersion);
         installation.setFile(new File("/Users/adam/gradle/current"));
         settings.addControl("Distribution", installation);
+        settings.addControl("JVM args", jvmArgs);
         settings.addControl("User home directory", userHomeDir);
         color.setSelected(true);
         settings.addControl(color);
@@ -286,7 +289,8 @@ public class UI {
             final boolean isColor = color.isSelected();
             final boolean isEmbedded = embedded.isSelected();
             final boolean isVerbose = verboseLogging.isSelected();
-            final String[] commandLine = commandLineArgs.getText().trim().split("\\s+");
+            final String[] commandLine = args(commandLineArgs.getText());
+            final String[] splitJvmArgs = args(jvmArgs.getText());
             final CancellationTokenSource tokenSource = GradleConnector.newCancellationTokenSource();
             token.set(tokenSource);
             final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(),
@@ -303,6 +307,9 @@ public class UI {
                     operation.setStandardError(console.getError());
                     if (commandLine.length > 0) {
                         operation.withArguments(commandLine);
+                    }
+                    if (splitJvmArgs.length > 0) {
+                        operation.setJvmArguments(splitJvmArgs);
                     }
                 }
             };
@@ -361,6 +368,14 @@ public class UI {
                     }
                 }
             }.start();
+        }
+
+        private String[] args(String source) {
+            String trimmed = source.trim();
+            if (trimmed.isEmpty()) {
+                return new String[0];
+            }
+            return trimmed.split("\\s+");
         }
     }
 
