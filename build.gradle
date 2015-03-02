@@ -17,4 +17,4 @@ dependencies {
     runtime 'org.slf4j:slf4j-simple:1.7.7'
 }
 
-mainClassName = 'org.gradle.gui.UI'
+mainClassName = 'net.rubygrapefruit.gradle.gui.UI'
