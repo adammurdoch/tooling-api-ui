@@ -1,10 +1,10 @@
 package net.rubygrapefruit.gradle.gui;
 
 import net.rubygrapefruit.gradle.gui.actions.FetchModel;
-import net.rubygrapefruit.gradle.gui.actions.RunBuildActionAction;
-import net.rubygrapefruit.gradle.gui.visualizations.*;
 import net.rubygrapefruit.gradle.gui.actions.MultiModel;
 import net.rubygrapefruit.gradle.gui.actions.RunBuildAction;
+import net.rubygrapefruit.gradle.gui.actions.RunBuildActionAction;
+import net.rubygrapefruit.gradle.gui.visualizations.*;
 import org.gradle.tooling.CancellationTokenSource;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.LongRunningOperation;
@@ -38,6 +38,7 @@ public class UI {
     private final JButton cancel;
     private final JButton shutdown;
     private final MainPanel panel;
+    private final TestTree testTree;
     private final List<JButton> buttons;
     private final PathControl projectDirSelector;
     private final PathControl installation;
@@ -76,6 +77,7 @@ public class UI {
         log = panel.getLog();
         System.setOut(log.getOutput());
         System.setErr(log.getError());
+        testTree = new TestTree();
         projectDirSelector = new PathControl();
         installation = new PathControl();
         userHomeDir = new PathControl();
@@ -111,6 +113,8 @@ public class UI {
         settings.addControl(shutdown);
         shutdown.addActionListener(new ShutdownListener());
 
+        panel.addTab("Tests", new JScrollPane(testTree));
+
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
         panel.addToolbarControl(runBuild);
@@ -133,6 +137,7 @@ public class UI {
         cancel.setEnabled(true);
         console.clearOutput();
         panel.onProgress("");
+        testTree.reset();
         log.getOutput().println("================");
         log.getOutput().print("Starting ");
         log.getOutput().println(displayName);
@@ -302,6 +307,10 @@ public class UI {
                         log.getOutput().println("[progress: " + event.getDescription() + "]");
                         panel.onProgress(event.getDescription());
                     });
+                    operation.addTestProgressListener(event -> {
+                        log.getOutput().println("[test progress: " + event.toString() + "]");
+                    });
+                    operation.addTestProgressListener(testTree);
                     operation.setColorOutput(isColor);
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());

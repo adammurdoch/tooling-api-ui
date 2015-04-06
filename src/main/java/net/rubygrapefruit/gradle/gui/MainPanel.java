@@ -56,12 +56,8 @@ public class MainPanel extends JPanel {
         toolbar.add(component);
     }
 
-    public void showTab(String title) {
-        tabs.setSelectedIndex(tabTitles.get(title));
-    }
-
     public void showConsole() {
-        tabs.setSelectedIndex(0);
+        tabs.setSelectedIndex(1);
     }
 
     public SettingsPanel getSettings() {
@@ -76,6 +72,9 @@ public class MainPanel extends JPanel {
         return log;
     }
 
+    /**
+     * Can be invoked from any thread.
+     */
     public void onProgress(final String text) {
         if (SwingUtilities.isEventDispatchThread()) {
             progress.setText(text);
