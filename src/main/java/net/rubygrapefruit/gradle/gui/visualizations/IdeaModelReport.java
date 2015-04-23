@@ -12,6 +12,8 @@ public class IdeaModelReport extends Report<IdeaProject> {
     @Override
     protected void render(IdeaProject project, StructureVisitor tree) {
         tree.struct("Project", project.getName(), () -> {
+            tree.value("JDK", project.getJdkName());
+            tree.value("Java version", project.getLanguageLevel().getLevel());
             tree.collection("Modules", project.getModules(), module -> {
                 tree.struct("Module", module.getName(), () -> {
                     tree.collection("Dependencies", module.getDependencies(), dependency -> {

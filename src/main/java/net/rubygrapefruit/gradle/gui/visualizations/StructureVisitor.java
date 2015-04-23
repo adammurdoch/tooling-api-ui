@@ -10,5 +10,7 @@ public interface StructureVisitor {
 
     void struct(String name, Object value, Runnable renderer);
 
+    <T> void collection(String name, Collection<T> collection);
+
     <T> void collection(String name, Collection<T> collection, Consumer<T> renderer);
 }

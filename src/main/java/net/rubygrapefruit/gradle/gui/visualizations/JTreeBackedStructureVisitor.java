@@ -39,6 +39,11 @@ public class JTreeBackedStructureVisitor implements StructureVisitor {
     }
 
     @Override
+    public <T> void collection(String name, Collection<T> collection) {
+        collection(name, collection, t -> value(t));
+    }
+
+    @Override
     public <T> void collection(String name, Collection<T> collection, Consumer<T> renderer) {
         if (collection.isEmpty()) {
             tree.node(String.format("%s - empty", name));

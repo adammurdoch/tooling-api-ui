@@ -11,6 +11,6 @@ public class BuildEnvironmentReport extends Report<BuildEnvironment> {
     protected void render(BuildEnvironment environment, StructureVisitor tree) {
         tree.value("Gradle version", environment.getGradle().getGradleVersion());
         tree.value("Java home", environment.getJava().getJavaHome());
-        tree.value("JVM args", environment.getJava().getJvmArguments());
+        tree.collection("JVM args", environment.getJava().getJvmArguments());
     }
 }
