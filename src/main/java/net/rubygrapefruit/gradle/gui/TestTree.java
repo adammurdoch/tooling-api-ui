@@ -1,6 +1,8 @@
 package net.rubygrapefruit.gradle.gui;
 
-import org.gradle.tooling.*;
+import org.gradle.tooling.events.*;
+import org.gradle.tooling.events.test.TestProgressEvent;
+import org.gradle.tooling.events.test.TestProgressListener;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -11,7 +13,7 @@ import java.util.Map;
 
 public class TestTree extends JTree implements TestProgressListener {
     private final DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode("<no tests>");
-    private final Map<TestDescriptor, DefaultMutableTreeNode> tests = new HashMap<>();
+    private final Map<OperationDescriptor, DefaultMutableTreeNode> tests = new HashMap<>();
     private final DefaultTreeModel model = new DefaultTreeModel(rootNode);
 
     public TestTree() {
@@ -37,9 +39,9 @@ public class TestTree extends JTree implements TestProgressListener {
         model.reload(rootNode);
     }
 
-    private void onTestEvent(TestProgressEvent event) {
+    private void onTestEvent(ProgressEvent event) {
         DefaultMutableTreeNode testNode;
-        if ((event instanceof TestStartedEvent) || (event instanceof TestSuiteStartedEvent)) {
+        if (event instanceof StartEvent) {
             if (tests.containsKey(event.getDescriptor())) {
                 throw new RuntimeException("Duplicate test start event.");
             }
@@ -52,19 +54,25 @@ public class TestTree extends JTree implements TestProgressListener {
             tests.put(event.getDescriptor(), testNode);
             model.insertNodeInto(testNode, parentNode, parentNode.getChildCount());
             setExpandedState(new TreePath(parentNode.getPath()), true);
-        } else {
+        } else if (event instanceof FinishEvent) {
             if (!tests.containsKey(event.getDescriptor())) {
                 throw new RuntimeException("Unexpected test event.");
             }
+            FinishEvent finishEvent = (FinishEvent) event;
             testNode = tests.get(event.getDescriptor());
-            if (event instanceof TestFailedEvent || event instanceof TestSuiteFailedEvent) {
+            if (finishEvent.getResult() instanceof FailureResult) {
                 testNode.setUserObject(event.getDescriptor().getName() + " (FAILED)");
-            } else if (event instanceof TestSkippedEvent || event instanceof TestSuiteSkippedEvent) {
+            } else if (finishEvent.getResult() instanceof SkippedResult) {
                 testNode.setUserObject(event.getDescriptor().getName() + " (skipped)");
-            } else {
+            } else if (finishEvent.getResult() instanceof SuccessResult) {
                 testNode.setUserObject(event.getDescriptor().getName() + " (passed)");
+            } else {
+                testNode.setUserObject(event.getDescriptor().getName() + " (unknown result)");
             }
             model.nodeChanged(testNode);
+        } else {
+            // Ignore
+            return;
         }
 
         scrollPathToVisible(new TreePath(testNode.getPath()));

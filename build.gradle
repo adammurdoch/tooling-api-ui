@@ -3,11 +3,12 @@ apply plugin: 'idea'
 apply plugin: 'eclipse'
 apply plugin: 'application'
 
-//def toolingApiVersion='latest.integration'
-def toolingApiVersion='2.3'
+def toolingApiVersion='latest.integration'
+//def toolingApiVersion='2.3'
 
 repositories {
-    maven { url '../../gradle/build/repo' }
+    //maven { url '../../gradle/build/repo' }
+    //maven { url '../gradle-release/build/repo' }
     maven { url 'https://repo.gradle.org/gradle/repo' }
     mavenCentral()
 }
