@@ -10,12 +10,7 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.MutableTreeNode;
 
 public class ProjectTree implements Visualization<GradleBuild> {
-    JTree tree;
-
-    public ProjectTree() {
-        this.tree = new JTree();
-        tree.setModel(new DefaultTreeModel(new DefaultMutableTreeNode()));
-    }
+    private final JTreeBackedVisitor<String> tree = new JTreeBackedVisitor<>("Projects");
 
     @Override
     public String getDisplayName() {
@@ -24,19 +19,20 @@ public class ProjectTree implements Visualization<GradleBuild> {
 
     @Override
     public JComponent getMainComponent() {
-        return tree;
+        return tree.getTree();
     }
 
     public void update(GradleBuild gradleBuild) {
-        tree.setModel(new DefaultTreeModel(toNode(gradleBuild.getRootProject())));
+        tree.reset();
+        visit(gradleBuild.getRootProject());
     }
 
-    private MutableTreeNode toNode(BasicGradleProject project) {
-        DefaultMutableTreeNode node = new DefaultMutableTreeNode();
-        node.setUserObject(String.format("Project %s", project.getName()));
+    private void visit(BasicGradleProject project) {
+        tree.node(String.format("Project %s", project.getName()));
+        tree.startChildren();
         for (BasicGradleProject childProject : project.getChildren()) {
-            node.add(toNode(childProject));
+            visit(childProject);
         }
-        return node;
+        tree.endChildren();
     }
 }
