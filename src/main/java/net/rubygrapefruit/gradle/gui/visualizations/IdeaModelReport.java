@@ -1,26 +1,16 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
-import net.rubygrapefruit.gradle.gui.Visualization;
-import org.gradle.tooling.model.idea.*;
+import org.gradle.tooling.model.idea.IdeaModuleDependency;
+import org.gradle.tooling.model.idea.IdeaProject;
+import org.gradle.tooling.model.idea.IdeaSingleEntryLibraryDependency;
 
-import javax.swing.*;
-
-public class IdeaModelReport implements Visualization<IdeaProject> {
-    private final JTreeBackedStructureVisitor tree = new JTreeBackedStructureVisitor("IDEA model");
-
-    @Override
-    public String getDisplayName() {
-        return "IDEA model";
+public class IdeaModelReport extends Report<IdeaProject> {
+    public IdeaModelReport() {
+        super("IDEA model");
     }
 
     @Override
-    public JComponent getMainComponent() {
-        return tree.getTree();
-    }
-
-    @Override
-    public void update(IdeaProject project) {
-        tree.reset();
+    protected void render(IdeaProject project, StructureVisitor tree) {
         tree.struct("Project", project.getName(), () -> {
             tree.collection("Modules", project.getModules(), module -> {
                 tree.struct("Module", module.getName(), () -> {

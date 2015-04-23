@@ -1,6 +1,7 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
 import javax.swing.*;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import java.util.Collection;
 import java.util.function.Consumer;
 

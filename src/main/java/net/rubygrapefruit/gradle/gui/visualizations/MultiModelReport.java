@@ -5,36 +5,28 @@ import org.gradle.tooling.model.GradleProject;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.idea.IdeaProject;
 
-import java.io.PrintWriter;
-
 public class MultiModelReport extends Report<MultiModel> {
-    @Override
-    public String getDisplayName() {
-        return "Custom build action";
+    public MultiModelReport() {
+        super("Custom build action");
     }
 
     @Override
-    protected void render(MultiModel result, PrintWriter stdOut) {
-        GradleProject gradleProject = result.gradleProject;
-        stdOut.println("== GRADLE ==");
-        stdOut.format("path: %s%n", gradleProject.getPath());
-        stdOut.format("name: %s%n", gradleProject.getName());
-        stdOut.format("build script: %s%n", gradleProject.getBuildScript().getSourceFile());
+    protected void render(MultiModel model, StructureVisitor tree) {
+        GradleProject gradleProject = model.gradleProject;
+        tree.struct("Gradle", gradleProject.getName(), () -> {
+            tree.value("Path", gradleProject.getPath());
+            tree.value("Build script", gradleProject.getBuildScript().getSourceFile());
+        });
 
-        EclipseProject eclipseProject = result.eclipseProject;
-        stdOut.println();
-        stdOut.println("== ECLIPSE ==");
-        stdOut.format("name: %s%n", eclipseProject.getName());
-        stdOut.format("project dir: %s%n", eclipseProject.getProjectDirectory());
+        EclipseProject eclipseProject = model.eclipseProject;
+        tree.struct("Eclipse", eclipseProject.getName(), () -> {
+            tree.value("Project directory", eclipseProject.getProjectDirectory());
+        });
 
-        IdeaProject ideaProject = result.ideaProject;
-        stdOut.println();
-        stdOut.println("== IDEA ==");
-        stdOut.format("name: %s%n", ideaProject.getName());
-        stdOut.format("jdk: %s%n", ideaProject.getJdkName());
-        stdOut.format("Java language: %s%n", ideaProject.getLanguageLevel().getLevel());
-        stdOut.format("output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getOutputDir());
-        stdOut.format("test output dir: %s%n", ideaProject.getModules().getAt(0).getCompilerOutput().getTestOutputDir());
-
+        IdeaProject ideaProject = model.ideaProject;
+        tree.struct("IDEA", ideaProject.getName(), () -> {
+            tree.value("JDK", ideaProject.getJdkName());
+            tree.value("Java language", ideaProject.getLanguageLevel().getLevel());
+        });
     }
 }

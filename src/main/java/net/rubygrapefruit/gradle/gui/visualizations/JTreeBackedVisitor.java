@@ -2,6 +2,7 @@ package net.rubygrapefruit.gradle.gui.visualizations;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import java.util.LinkedList;
@@ -17,6 +18,12 @@ public class JTreeBackedVisitor implements TreeVisitor {
     public JTreeBackedVisitor(String name) {
         root.setUserObject(name);
         tree.setModel(model);
+        DefaultTreeCellRenderer renderer = new DefaultTreeCellRenderer();
+        ImageIcon icon = new ImageIcon(getClass().getResource("/gradle-icon-16x16.png"));
+        renderer.setLeafIcon(icon);
+        renderer.setClosedIcon(icon);
+        renderer.setOpenIcon(icon);
+        tree.setCellRenderer(renderer);
         parent = root;
     }
 

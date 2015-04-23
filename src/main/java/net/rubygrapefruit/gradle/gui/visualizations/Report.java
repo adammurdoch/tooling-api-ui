@@ -3,32 +3,31 @@ package net.rubygrapefruit.gradle.gui.visualizations;
 import net.rubygrapefruit.gradle.gui.Visualization;
 
 import javax.swing.*;
-import java.awt.*;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
 public abstract class Report<T> implements Visualization<T> {
-    JTextPane text;
+    private final JTreeBackedStructureVisitor tree;
+    private final String title;
 
-    public Report() {
-        this.text = new JTextPane();
-        text.setFont(new Font("monospaced", Font.PLAIN, 13));
-        text.setEditable(false);
+    public Report(String title) {
+        this.title = title;
+        tree = new JTreeBackedStructureVisitor(title);
+    }
+
+    @Override
+    public String getDisplayName() {
+        return title;
     }
 
     @Override
     public JComponent getMainComponent() {
-        return text;
+        return tree.getTree();
     }
 
     @Override
     public void update(T model) {
-        StringWriter contents = new StringWriter();
-        PrintWriter output = new PrintWriter(contents);
-        render(model, output);
-        output.flush();
-        text.setText(contents.toString());
+        tree.reset();
+        render(model, tree);
     }
 
-    protected abstract void render(T project, PrintWriter output);
+    protected abstract void render(T model, StructureVisitor output);
 }

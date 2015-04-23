@@ -2,18 +2,15 @@ package net.rubygrapefruit.gradle.gui.visualizations;
 
 import org.gradle.tooling.model.build.BuildEnvironment;
 
-import java.io.PrintWriter;
-
 public class BuildEnvironmentReport extends Report<BuildEnvironment> {
-    @Override
-    public String getDisplayName() {
-        return "Build environment";
+    public BuildEnvironmentReport() {
+        super("Build environment");
     }
 
     @Override
-    protected void render(BuildEnvironment project, PrintWriter output) {
-        output.format("Gradle version: %s%n", project.getGradle().getGradleVersion());
-        output.format("Java version: %s%n", project.getJava().getJavaHome());
-        output.format("JVM args: %s%n", project.getJava().getJvmArguments());
+    protected void render(BuildEnvironment environment, StructureVisitor tree) {
+        tree.value("Gradle version", environment.getGradle().getGradleVersion());
+        tree.value("Java home", environment.getJava().getJavaHome());
+        tree.value("JVM args", environment.getJava().getJvmArguments());
     }
 }
