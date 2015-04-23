@@ -5,12 +5,9 @@ import org.gradle.tooling.model.gradle.BasicGradleProject;
 import org.gradle.tooling.model.gradle.GradleBuild;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.MutableTreeNode;
 
 public class ProjectTree implements Visualization<GradleBuild> {
-    private final JTreeBackedVisitor<String> tree = new JTreeBackedVisitor<>("Projects");
+    private final JTreeBackedVisitor tree = new JTreeBackedVisitor("Projects");
 
     @Override
     public String getDisplayName() {

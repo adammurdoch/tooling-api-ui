@@ -6,7 +6,7 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import java.util.LinkedList;
 
-public class JTreeBackedVisitor<T> implements TreeVisitor<T> {
+public class JTreeBackedVisitor implements TreeVisitor {
     private final DefaultMutableTreeNode root = new DefaultMutableTreeNode();
     private final DefaultTreeModel model = new DefaultTreeModel(root);
     private final JTree tree = new JTree();
@@ -31,7 +31,7 @@ public class JTreeBackedVisitor<T> implements TreeVisitor<T> {
     }
 
     @Override
-    public void node(T node) {
+    public void node(Object node) {
         current = new DefaultMutableTreeNode(node);
         model.insertNodeInto(current, parent, parent.getChildCount());
         tree.expandPath(new TreePath(parent.getPath()));

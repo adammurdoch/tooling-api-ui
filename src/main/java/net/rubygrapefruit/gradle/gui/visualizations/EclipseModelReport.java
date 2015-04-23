@@ -1,45 +1,38 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
-import org.gradle.tooling.model.ExternalDependency;
-import org.gradle.tooling.model.Task;
+import net.rubygrapefruit.gradle.gui.Visualization;
 import org.gradle.tooling.model.eclipse.EclipseProject;
-import org.gradle.tooling.model.eclipse.EclipseSourceDirectory;
 
-import java.io.PrintWriter;
+import javax.swing.*;
 
-public class EclipseModelReport extends Report<EclipseProject> {
+public class EclipseModelReport implements Visualization<EclipseProject> {
+    private final JTreeBackedStructureVisitor tree = new JTreeBackedStructureVisitor("Eclipse model");
+
     @Override
     public String getDisplayName() {
         return "Eclipse model";
     }
 
-    protected void render(EclipseProject project, PrintWriter output) {
-        output.println();
-        output.println("PROJECT");
-        output.format("%s (%s)%n", project.getName(), project);
-        output.format("build script: %s%n", project.getGradleProject().getBuildScript().getSourceFile());
-        output.println();
+    @Override
+    public JComponent getMainComponent() {
+        return tree.getTree();
+    }
 
-        output.println("SOURCE DIRECTORIES");
-        for (EclipseSourceDirectory sourceDirectory : project.getSourceDirectories()) {
-            output.format("%s -> %s%n", sourceDirectory.getPath(), sourceDirectory.getDirectory());
-        }
-        output.println();
+    @Override
+    public void update(EclipseProject project) {
+        tree.reset();
+        render(project);
+    }
 
-        output.println("CLASSPATH");
-        for (ExternalDependency dependency : project.getClasspath()) {
-            output.format("%s -> %s%n", dependency.getGradleModuleVersion(), dependency.getFile());
-        }
-        output.println();
-
-        output.println("TASKS");
-        for (Task task : project.getGradleProject().getTasks()) {
-            output.format("%s (%s)%n", task.getName(), task);
-        }
-        output.println();
-
-        for (EclipseProject childProject : project.getChildren()) {
-            render(childProject, output);
-        }
+    private void render(EclipseProject project) {
+        tree.struct("Project", project.getName(), () -> {
+            tree.collection("Dependencies", project.getProjectDependencies(), dependency -> {
+                tree.value(dependency.getTargetProject().getName());
+            });
+            tree.collection("Classpath", project.getClasspath(), entry -> {
+                tree.value(entry.getGradleModuleVersion());
+            });
+            tree.collection("Children", project.getChildren(), child -> render(child));
+        });
     }
 }

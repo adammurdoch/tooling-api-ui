@@ -1,7 +1,7 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
-public interface TreeVisitor<T> {
-    void node(T node);
+public interface TreeVisitor {
+    void node(Object node);
 
     void startChildren();
 
