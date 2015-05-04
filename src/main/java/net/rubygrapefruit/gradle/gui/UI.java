@@ -38,7 +38,7 @@ public class UI {
     private final JButton cancel;
     private final JButton shutdown;
     private final MainPanel panel;
-    private final TestTree testTree;
+    private final BuildEventTree buildEventTree;
     private final List<JButton> buttons;
     private final PathControl projectDirSelector;
     private final PathControl installation;
@@ -77,7 +77,7 @@ public class UI {
         log = panel.getLog();
         System.setOut(log.getOutput());
         System.setErr(log.getError());
-        testTree = new TestTree();
+        buildEventTree = new BuildEventTree();
         projectDirSelector = new PathControl();
         installation = new PathControl();
         userHomeDir = new PathControl();
@@ -113,7 +113,7 @@ public class UI {
         settings.addControl(shutdown);
         shutdown.addActionListener(new ShutdownListener());
 
-        panel.addTab("Tests", new JScrollPane(testTree));
+        panel.addTab("Build events", new JScrollPane(buildEventTree));
 
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
@@ -137,7 +137,7 @@ public class UI {
         cancel.setEnabled(true);
         console.clearOutput();
         panel.onProgress("");
-        testTree.reset();
+        buildEventTree.reset();
         log.getOutput().println("================");
         log.getOutput().print("Starting ");
         log.getOutput().println(displayName);
@@ -310,7 +310,9 @@ public class UI {
                     operation.addTestProgressListener(event -> {
                         log.getOutput().println("[test progress: " + event.toString() + "]");
                     });
-                    operation.addTestProgressListener(testTree);
+                    operation.addBuildProgressListener(buildEventTree);
+                    operation.addTaskProgressListener(buildEventTree);
+                    operation.addTestProgressListener(buildEventTree);
                     operation.setColorOutput(isColor);
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());

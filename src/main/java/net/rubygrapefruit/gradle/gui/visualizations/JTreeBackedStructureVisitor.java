@@ -1,8 +1,8 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultTreeCellRenderer;
 import java.util.Collection;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class JTreeBackedStructureVisitor implements StructureVisitor {
@@ -39,7 +39,22 @@ public class JTreeBackedStructureVisitor implements StructureVisitor {
     }
 
     @Override
-    public <T> void collection(String name, Collection<T> collection) {
+    public void map(String name, Map<String, ?> map) {
+        if (map.isEmpty()) {
+            tree.node(String.format("%s - empty", name));
+            return;
+        }
+
+        tree.node(name);
+        tree.startChildren();
+        for (Map.Entry<String, ?> entry : map.entrySet()) {
+            value(entry.getKey(), entry.getValue());
+        }
+        tree.endChildren();
+    }
+
+    @Override
+    public void collection(String name, Collection<?> collection) {
         collection(name, collection, t -> value(t));
     }
 
