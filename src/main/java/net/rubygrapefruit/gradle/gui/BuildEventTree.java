@@ -1,62 +1,66 @@
 package net.rubygrapefruit.gradle.gui;
 
 import org.gradle.tooling.events.*;
-import org.gradle.tooling.events.build.BuildProgressEvent;
-import org.gradle.tooling.events.build.BuildProgressListener;
-import org.gradle.tooling.events.task.TaskProgressEvent;
-import org.gradle.tooling.events.task.TaskProgressListener;
-import org.gradle.tooling.events.test.TestProgressEvent;
-import org.gradle.tooling.events.test.TestProgressListener;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeCellRenderer;
-import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.TreePath;
+import javax.swing.tree.*;
+import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
 
-public class BuildEventTree extends JTree implements TestProgressListener, TaskProgressListener, BuildProgressListener {
+public class BuildEventTree extends JPanel implements ProgressListener {
     private final DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode();
     private final Map<OperationDescriptor, DefaultMutableTreeNode> operations = new HashMap<>();
     private final DefaultTreeModel model = new DefaultTreeModel(rootNode);
+    private final SettingsPanel detail = new SettingsPanel();
+    private final JLabel eventDisplayName = new JLabel();
+    private final JLabel operationName = new JLabel();
+    private final JLabel operationDisplayName = new JLabel();
+    private final JTree tree = new JTree();
 
     public BuildEventTree() {
-        setModel(model);
-        DefaultTreeCellRenderer renderer = new DefaultTreeCellRenderer();
-        ImageIcon icon = new ImageIcon(getClass().getResource("/gradle-icon-16x16.png"));
-        renderer.setLeafIcon(icon);
-        renderer.setClosedIcon(icon);
-        renderer.setOpenIcon(icon);
-        setCellRenderer(renderer);
+        setLayout(new BorderLayout());
+
+        tree.setModel(model);
+        tree.setCellRenderer(new Renderer());
         reset();
+        tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+        tree.addTreeSelectionListener(e -> {
+            if (e.isAddedPath()) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) e.getPath().getLastPathComponent();
+                Object object = node.getUserObject();
+                if (object instanceof StartEvent) {
+                    StartEvent event = (StartEvent) object;
+                    eventDisplayName.setText(event.getDisplayName());
+                    operationName.setText(event.getDescriptor().getName());
+                    operationDisplayName.setText(event.getDescriptor().getDisplayName());
+                    return;
+                } else if (object instanceof FinishEvent) {
+                    FinishEvent event = (FinishEvent) object;
+                    eventDisplayName.setText(event.getDisplayName());
+                    operationName.setText(event.getDescriptor().getName());
+                    operationDisplayName.setText(event.getDescriptor().getDisplayName());
+                    return;
+                }
+            }
+            eventDisplayName.setText("");
+            operationName.setText("");
+            operationDisplayName.setText("");
+        });
+
+        detail.addControl("Event display name", eventDisplayName);
+        detail.addControl("Operation name", operationName);
+        detail.addControl("Operation display name", operationDisplayName);
+
+        add(new JScrollPane(tree), BorderLayout.CENTER);
+        add(detail, BorderLayout.SOUTH);
     }
 
     /**
      * Can be invoked from any thread.
      */
     @Override
-    public void statusChanged(BuildProgressEvent event) {
-        onEvent(event);
-    }
-
-    /**
-     * Can be invoked from any thread.
-     */
-    @Override
-    public void statusChanged(TaskProgressEvent event) {
-        onEvent(event);
-    }
-
-    /**
-     * Can be invoked from any thread.
-     */
-    @Override
-    public void statusChanged(TestProgressEvent event) {
-        onEvent(event);
-    }
-
-    private void onEvent(ProgressEvent event) {
+    public void statusChanged(ProgressEvent event) {
         if (SwingUtilities.isEventDispatchThread()) {
             updateUi(event);
         }
@@ -81,31 +85,58 @@ public class BuildEventTree extends JTree implements TestProgressListener, TaskP
             rootNode.setUserObject("Build events");
             model.nodeChanged(rootNode);
             DefaultMutableTreeNode parentNode = event.getDescriptor().getParent() == null ? rootNode : operations.get(event.getDescriptor().getParent());
-            operationNode = new DefaultMutableTreeNode(event.getDescriptor().getName() + " (running)");
+            operationNode = new DefaultMutableTreeNode(event);
             operations.put(event.getDescriptor(), operationNode);
             model.insertNodeInto(operationNode, parentNode, parentNode.getChildCount());
-            setExpandedState(new TreePath(parentNode.getPath()), true);
+            tree.expandPath(new TreePath(parentNode.getPath()));
         } else if (event instanceof FinishEvent) {
             if (!operations.containsKey(event.getDescriptor())) {
                 throw new RuntimeException("Unexpected finish event.");
             }
             FinishEvent finishEvent = (FinishEvent) event;
             operationNode = operations.get(event.getDescriptor());
-            if (finishEvent.getResult() instanceof FailureResult) {
-                operationNode.setUserObject(event.getDescriptor().getName() + " (FAILED)");
-            } else if (finishEvent.getResult() instanceof SkippedResult) {
-                operationNode.setUserObject(event.getDescriptor().getName() + " (skipped)");
-            } else if (finishEvent.getResult() instanceof SuccessResult) {
-                operationNode.setUserObject(event.getDescriptor().getName() + " (passed)");
-            } else {
-                operationNode.setUserObject(event.getDescriptor().getName() + " (unknown result)");
-            }
+            operationNode.setUserObject(finishEvent);
             model.nodeChanged(operationNode);
         } else {
             // Ignore
             return;
         }
 
-        scrollPathToVisible(new TreePath(operationNode.getPath()));
+        tree.scrollPathToVisible(new TreePath(operationNode.getPath()));
+    }
+
+    private static class Renderer extends DefaultTreeCellRenderer {
+        public Renderer() {
+            ImageIcon icon = new ImageIcon(getClass().getResource("/gradle-icon-16x16.png"));
+            setLeafIcon(icon);
+            setClosedIcon(icon);
+            setOpenIcon(icon);
+        }
+
+        @Override
+        public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded,
+                                                      boolean leaf, int row, boolean hasFocus) {
+            super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+            if (value instanceof DefaultMutableTreeNode) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+                Object object = node.getUserObject();
+                if (object instanceof StartEvent) {
+                    StartEvent event = (StartEvent) object;
+                    setText(event.getDescriptor().getName() + " (running)");
+                } else if (object instanceof FinishEvent) {
+                    FinishEvent event = (FinishEvent) object;
+                    if (event.getResult() instanceof FailureResult) {
+                        setText(event.getDescriptor().getName() + " (FAILED)");
+                    } else if (event.getResult() instanceof SkippedResult) {
+                        setText(event.getDescriptor().getName() + " (skipped)");
+                    } else if (event.getResult() instanceof SuccessResult) {
+                        setText(event.getDescriptor().getName());
+                    } else {
+                        setText(event.getDescriptor().getName() + " (unknown result)");
+                    }
+                }
+            }
+            return this;
+        }
     }
 }

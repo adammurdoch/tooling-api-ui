@@ -113,7 +113,7 @@ public class UI {
         settings.addControl(shutdown);
         shutdown.addActionListener(new ShutdownListener());
 
-        panel.addTab("Build events", new JScrollPane(buildEventTree));
+        panel.addTab("Build events", buildEventTree);
 
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
@@ -303,16 +303,11 @@ public class UI {
                 @Override
                 public void setup(LongRunningOperation operation) {
                     operation.withCancellationToken(tokenSource.token());
-                    operation.addProgressListener(event -> {
+                    operation.addProgressListener((org.gradle.tooling.ProgressEvent event) -> {
                         log.getOutput().println("[progress: " + event.getDescription() + "]");
                         panel.onProgress(event.getDescription());
                     });
-                    operation.addTestProgressListener(event -> {
-                        log.getOutput().println("[test progress: " + event.toString() + "]");
-                    });
-                    operation.addBuildProgressListener(buildEventTree);
-                    operation.addTaskProgressListener(buildEventTree);
-                    operation.addTestProgressListener(buildEventTree);
+                    operation.addProgressListener(buildEventTree);
                     operation.setColorOutput(isColor);
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());
