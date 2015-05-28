@@ -9,7 +9,9 @@ public interface StructureVisitor {
 
     void value(String name, Object value);
 
-    void struct(String name, Object value, Runnable renderer);
+    void struct(String name, String value, Runnable renderer);
+
+    <T> void struct(String name, T value, Consumer<T> renderer);
 
     void collection(String name, Collection<?> collection);
 

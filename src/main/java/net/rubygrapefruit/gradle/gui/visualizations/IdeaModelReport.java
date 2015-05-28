@@ -19,10 +19,18 @@ public class IdeaModelReport extends Report<IdeaProject> {
                     tree.collection("Dependencies", module.getDependencies(), dependency -> {
                         if (dependency instanceof IdeaModuleDependency) {
                             IdeaModuleDependency moduleDependency = (IdeaModuleDependency) dependency;
-                            tree.value(String.format("Module %s (%s)", moduleDependency.getDependencyModule().getName(), moduleDependency.getScope().getScope()));
+                            tree.struct(String.format("Module %s", moduleDependency.getDependencyModule().getName()), moduleDependency, dep -> {
+                                tree.value("Exported", dep.getExported());
+                                tree.value("Scope", dep.getScope());
+                            });
                         } else if (dependency instanceof IdeaSingleEntryLibraryDependency) {
                             IdeaSingleEntryLibraryDependency libraryDependency = (IdeaSingleEntryLibraryDependency) dependency;
-                            tree.value(String.format("Library %s (%s)", libraryDependency.getGradleModuleVersion(), libraryDependency.getScope().getScope()));
+                            String coords = String.format("Library %s:%s:%s", libraryDependency.getGradleModuleVersion().getGroup(),
+                                    libraryDependency.getGradleModuleVersion().getName(), libraryDependency.getGradleModuleVersion().getVersion());
+                            tree.struct(coords, libraryDependency, dep -> {
+                                tree.value("Exported", dep.getExported());
+                                tree.value("Scope", dep.getScope());
+                            });
                         } else {
                             tree.value(dependency.toString());
                         }

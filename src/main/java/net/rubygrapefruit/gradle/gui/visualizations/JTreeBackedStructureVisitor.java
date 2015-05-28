@@ -31,7 +31,15 @@ public class JTreeBackedStructureVisitor implements StructureVisitor {
     }
 
     @Override
-    public void struct(String name, Object value, Runnable renderer) {
+    public <T> void struct(String name, T value, Consumer<T> renderer) {
+        value(name);
+        tree.startChildren();
+        renderer.accept(value);
+        tree.endChildren();
+    }
+
+    @Override
+    public void struct(String name, String value, Runnable renderer) {
         value(name, value);
         tree.startChildren();
         renderer.run();
