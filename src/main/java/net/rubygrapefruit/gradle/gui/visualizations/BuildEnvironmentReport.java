@@ -4,8 +4,6 @@ import org.gradle.tooling.model.build.BuildEnvironment;
 import org.gradle.tooling.model.build.GradleEnvironment;
 import org.gradle.tooling.model.build.JavaEnvironment;
 
-import java.util.TreeMap;
-
 public class BuildEnvironmentReport extends Report<BuildEnvironment> {
     public BuildEnvironmentReport() {
         super("Build environment");
@@ -19,11 +17,7 @@ public class BuildEnvironmentReport extends Report<BuildEnvironment> {
         });
         tree.struct("Java", environment.getJava(), (JavaEnvironment javaEnvironment) -> {
             tree.value("Java home", javaEnvironment.getJavaHome());
-            tree.collection("Requested JVM args", javaEnvironment.getRequestedJvmArguments());
             tree.collection("JVM args", javaEnvironment.getJvmArguments());
-            tree.collection("All JVM args", javaEnvironment.getAllJvmArguments());
-            tree.map("Requested system properties", new TreeMap<>(javaEnvironment.getRequestedSystemProperties()));
-            tree.map("System properties", new TreeMap<>(javaEnvironment.getSystemProperties()));
         });
     }
 }
