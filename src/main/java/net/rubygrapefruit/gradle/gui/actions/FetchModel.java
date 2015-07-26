@@ -18,9 +18,8 @@ public class FetchModel<T> implements ToolingOperation<T> {
     }
 
     @Override
-    public T run(ProjectConnection connection, UIContext uiContext) {
-        ModelBuilder<T> builder = connection.model(type);
-        uiContext.setup(builder);
+    public T run(UIContext uiContext) {
+        ModelBuilder<T> builder = uiContext.create(projectConnection -> projectConnection.model(type));
         return builder.get();
     }
 }

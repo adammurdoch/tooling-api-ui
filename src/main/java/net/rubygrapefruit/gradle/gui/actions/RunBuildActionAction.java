@@ -28,9 +28,8 @@ public class RunBuildActionAction implements ToolingOperation<MultiModel> {
     }
 
     @Override
-    public MultiModel run(ProjectConnection connection, UIContext uiContext) {
-        BuildActionExecuter<MultiModel> executer = connection.action(new ToolingBuildAction());
-        uiContext.setup(executer);
+    public MultiModel run(UIContext uiContext) {
+        BuildActionExecuter<MultiModel> executer = uiContext.create(projectConnection -> projectConnection.action(new ToolingBuildAction()));
         return executer.run();
     }
 }

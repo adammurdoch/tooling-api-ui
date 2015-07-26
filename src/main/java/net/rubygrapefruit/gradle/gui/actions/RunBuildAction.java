@@ -12,9 +12,8 @@ public class RunBuildAction implements ToolingOperation<Void> {
     }
 
     @Override
-    public Void run(ProjectConnection connection, UIContext uiContext) {
-        BuildLauncher launcher = connection.newBuild();
-        uiContext.setup(launcher);
+    public Void run(UIContext uiContext) {
+        BuildLauncher launcher = uiContext.create(projectConnection -> projectConnection.newBuild());
         launcher.run();
         return null;
     }

@@ -57,16 +57,11 @@ public class BuildEventTree extends JPanel implements ProgressListener {
     }
 
     /**
-     * Can be invoked from any thread.
+     * Can be invoked from Swing thread only.
      */
     @Override
     public void statusChanged(ProgressEvent event) {
-        if (SwingUtilities.isEventDispatchThread()) {
-            updateUi(event);
-        }
-        else {
-            SwingUtilities.invokeLater(() -> updateUi(event));
-        }
+        updateUi(event);
     }
 
     public void reset() {

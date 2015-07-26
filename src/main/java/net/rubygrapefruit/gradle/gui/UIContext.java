@@ -21,6 +21,8 @@ public abstract class UIContext {
         this.commandLineArgs = commandLineArgs;
     }
 
+    public abstract <T extends LongRunningOperation> T create(OperationProvider<T> provider);
+
     public File getProjectDir() {
         return projectDir;
     }
@@ -40,6 +42,4 @@ public abstract class UIContext {
     public List<String> getCommandLineArgs() {
         return commandLineArgs;
     }
-
-    public abstract void setup(LongRunningOperation operation);
 }

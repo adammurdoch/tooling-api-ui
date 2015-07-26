@@ -9,6 +9,7 @@ import org.gradle.tooling.CancellationTokenSource;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.LongRunningOperation;
 import org.gradle.tooling.ProjectConnection;
+import org.gradle.tooling.events.OperationType;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
 import org.gradle.tooling.model.build.BuildEnvironment;
 import org.gradle.tooling.model.eclipse.EclipseProject;
@@ -26,6 +27,7 @@ import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -39,6 +41,7 @@ public class UI {
     private final JButton shutdown;
     private final MainPanel panel;
     private final BuildEventTree buildEventTree;
+    private final TestsView testsView;
     private final List<JButton> buttons;
     private final PathControl projectDirSelector;
     private final PathControl installation;
@@ -78,6 +81,7 @@ public class UI {
         System.setOut(log.getOutput());
         System.setErr(log.getError());
         buildEventTree = new BuildEventTree();
+        testsView = new TestsView();
         projectDirSelector = new PathControl();
         installation = new PathControl();
         userHomeDir = new PathControl();
@@ -114,6 +118,7 @@ public class UI {
         shutdown.addActionListener(new ShutdownListener());
 
         panel.addTab("Build events", buildEventTree);
+        panel.addTab("Tests", testsView);
 
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
         commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
@@ -138,6 +143,7 @@ public class UI {
         console.clearOutput();
         panel.onProgress("");
         buildEventTree.reset();
+        testsView.reset();
         log.getOutput().println("================");
         log.getOutput().print("Starting ");
         log.getOutput().println(displayName);
@@ -298,16 +304,24 @@ public class UI {
             final String[] splitJvmArgs = args(jvmArgs.getText());
             final CancellationTokenSource tokenSource = GradleConnector.newCancellationTokenSource();
             token.set(tokenSource);
+            AtomicReference<ProjectConnection> connectionRef = new AtomicReference<>();
             final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(),
                     Arrays.asList(commandLine)) {
                 @Override
+                public <T extends LongRunningOperation> T create(OperationProvider<T> provider) {
+                    T operation = provider.create(connectionRef.get());
+                    setup(operation);
+                    return operation;
+                }
+
                 public void setup(LongRunningOperation operation) {
                     operation.withCancellationToken(tokenSource.token());
                     operation.addProgressListener((org.gradle.tooling.ProgressEvent event) -> {
                         log.getOutput().println("[progress: " + event.getDescription() + "]");
                         panel.onProgress(event.getDescription());
                     });
-                    operation.addProgressListener(buildEventTree);
+                    operation.addProgressListener(new SwingBackedProgressListener(buildEventTree));
+                    operation.addProgressListener(new SwingBackedProgressListener(testsView), Collections.singleton(OperationType.TEST));
                     operation.setColorOutput(isColor);
                     operation.setStandardOutput(console.getOutput());
                     operation.setStandardError(console.getError());
@@ -351,7 +365,8 @@ public class UI {
                         }
                         ProjectConnection connection = connector.forProjectDirectory(projectDir).connect();
                         try {
-                            result = operation.run(connection, uiContext);
+                            connectionRef.set(connection);
+                            result = operation.run(uiContext);
                         } finally {
                             connection.close();
                         }
