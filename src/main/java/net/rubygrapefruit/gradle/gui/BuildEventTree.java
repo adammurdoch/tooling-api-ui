@@ -1,6 +1,7 @@
 package net.rubygrapefruit.gradle.gui;
 
 import org.gradle.tooling.events.*;
+import org.gradle.tooling.events.task.TaskSuccessResult;
 
 import javax.swing.*;
 import javax.swing.tree.*;
@@ -125,7 +126,12 @@ public class BuildEventTree extends JPanel implements ProgressListener {
                     } else if (event.getResult() instanceof SkippedResult) {
                         setText(event.getDescriptor().getName() + " (skipped)");
                     } else if (event.getResult() instanceof SuccessResult) {
-                        setText(event.getDescriptor().getName());
+                        if (event.getResult() instanceof TaskSuccessResult) {
+                            TaskSuccessResult taskResult = (TaskSuccessResult) event.getResult();
+                            setText(event.getDescriptor().getName() + (taskResult.isUpToDate() ? " (up-to-date)" : ""));
+                        } else {
+                            setText(event.getDescriptor().getName());
+                        }
                     } else {
                         setText(event.getDescriptor().getName() + " (unknown result)");
                     }
