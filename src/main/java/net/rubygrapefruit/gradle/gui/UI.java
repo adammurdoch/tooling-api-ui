@@ -79,7 +79,7 @@ public class UI {
         System.setOut(log.getOutput());
         System.setErr(log.getError());
         buildEventTree = new BuildEventTree();
-        testsView = new TestsView();
+        testsView = new TestsView(executer);
         projectDirSelector = new PathControl();
         installation = new PathControl();
         userHomeDir = new PathControl();

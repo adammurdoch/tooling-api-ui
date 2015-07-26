@@ -1,5 +1,6 @@
 package net.rubygrapefruit.gradle.gui;
 
+import org.gradle.tooling.TestLauncher;
 import org.gradle.tooling.events.ProgressEvent;
 import org.gradle.tooling.events.ProgressListener;
 import org.gradle.tooling.events.test.TestOperationDescriptor;
@@ -15,7 +16,7 @@ public class TestsView extends JPanel implements ProgressListener {
     private final JTable table;
     private final DefaultTableModel tableModel;
 
-    public TestsView() {
+    public TestsView(ToolingOperationExecuter executer) {
         setLayout(new BorderLayout());
         add(new JTextField(), BorderLayout.NORTH);
         table = new JTable();
@@ -31,8 +32,21 @@ public class TestsView extends JPanel implements ProgressListener {
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
                     int row = table.rowAtPoint(e.getPoint());
-                    TestOperationDescriptor descriptor = (TestOperationDescriptor) tableModel.getValueAt(row, 0);
-                    JOptionPane.showMessageDialog(null, "TEST: " + descriptor);
+                    final TestOperationDescriptor descriptor = (TestOperationDescriptor) tableModel.getValueAt(row, 0);
+                    executer.start(new ToolingOperation<Object>() {
+                        @Override
+                        public String getDisplayName(ToolingOperationContext uiContext) {
+                            return "run test " + descriptor;
+                        }
+
+                        @Override
+                        public Object run(ToolingOperationContext uiContext) {
+                            TestLauncher testLauncher = uiContext.create(projectConnection -> projectConnection.newTestLauncher());
+                            testLauncher.withTests(descriptor);
+                            testLauncher.run();
+                            return null;
+                        }
+                    });
                 }
             }
         });
