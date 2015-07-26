@@ -11,6 +11,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.Arrays;
 
 public class TestsView extends JPanel implements ProgressListener {
     private final JTable table;
@@ -18,7 +19,25 @@ public class TestsView extends JPanel implements ProgressListener {
 
     public TestsView(ToolingOperationExecuter executer) {
         setLayout(new BorderLayout());
-        add(new JTextField(), BorderLayout.NORTH);
+        JTextField testNames = new JTextField();
+        testNames.addActionListener(e -> {
+            final String[] tests = (testNames.getText().split(",?\\s+"));
+            executer.start(new ToolingOperation<Object>() {
+                @Override
+                public String getDisplayName(ToolingOperationContext uiContext) {
+                    return "run tests " + Arrays.asList(tests);
+                }
+
+                @Override
+                public Object run(ToolingOperationContext uiContext) {
+                    TestLauncher testLauncher = uiContext.create(projectConnection -> projectConnection.newTestLauncher());
+                    testLauncher.withJvmTestClasses(tests);
+                    testLauncher.run();
+                    return null;
+                }
+            });
+        });
+        add(testNames, BorderLayout.NORTH);
         table = new JTable();
         tableModel = new DefaultTableModel(new Object[]{"Name"}, 0) {
             @Override
