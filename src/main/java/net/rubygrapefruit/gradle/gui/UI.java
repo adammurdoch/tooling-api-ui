@@ -18,11 +18,8 @@ import org.gradle.tooling.model.gradle.GradleBuild;
 import org.gradle.tooling.model.idea.IdeaProject;
 
 import javax.swing.*;
-import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -64,12 +61,12 @@ public class UI {
         originalStdErr = System.err;
         runBuild = new JButton("Build");
         cancel = new JButton("Cancel");
-        VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new ProjectTree());
-        VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModelOperation<>(BuildInvocations.class), new TasksTable());
-        VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModelOperation<>(BuildEnvironment.class), new BuildEnvironmentReport());
-        VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModelOperation<>(EclipseProject.class), new EclipseModelReport());
-        VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModelOperation<>(IdeaProject.class), new IdeaModelReport());
-        VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionOperation(), new MultiModelReport());
+        VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new ProjectTree(), executer);
+        VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModelOperation<>(BuildInvocations.class), new TasksTable(), executer);
+        VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModelOperation<>(BuildEnvironment.class), new BuildEnvironmentReport(), executer);
+        VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModelOperation<>(EclipseProject.class), new EclipseModelReport(), executer);
+        VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModelOperation<>(IdeaProject.class), new IdeaModelReport(), executer);
+        VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionOperation(), new MultiModelReport(), executer);
         panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject, multiModel);
         buttons = new ArrayList<>();
         buttons.add(runBuild);
@@ -169,107 +166,15 @@ public class UI {
         cancel.setEnabled(false);
     }
 
-    private class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
-        private final Visualization<? super T> visualization;
-        private final JButton button;
-        private final JLayeredPane main;
-        private final JLabel overlay;
-        private final JPanel overlayPanel;
-        private final JScrollPane mainWrapper;
-
-        private VisualizationPanel(ToolingOperation<? extends T> operation, Visualization<? super T> visualization) {
-            this.visualization = visualization;
-            this.main = new JLayeredPane();
-
-            JComponent mainComponent = visualization.getMainComponent();
-            mainWrapper = new JScrollPane(mainComponent);
-            main.add(mainWrapper, JLayeredPane.DEFAULT_LAYER);
-
-            overlay = new JLabel();
-            overlay.setText(String.format("Click '%s' to load", visualization.getDisplayName()));
-            overlay.setFont(overlay.getFont().deriveFont(18f));
-            overlayPanel = new JPanel();
-            overlayPanel.add(overlay);
-            overlayPanel.setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
-            main.add(overlayPanel, JLayeredPane.MODAL_LAYER);
-            main.addComponentListener(new ComponentAdapter() {
-                @Override
-                public void componentResized(ComponentEvent e) {
-                    resizeOverlay();
-                }
-            });
-            button = new JButton(visualization.getDisplayName());
-            button.addActionListener(new BuildAction<>(operation, this));
-            main.add(button, JLayeredPane.DEFAULT_LAYER);
-        }
-
-        void resizeOverlay() {
-            Dimension buttonSize = button.getPreferredSize();
-            button.setLocation(main.getWidth() - buttonSize.width, 0);
-            button.setSize(buttonSize);
-            mainWrapper.setLocation(0, buttonSize.height + 5);
-            mainWrapper.setSize(main.getSize().width, main.getSize().height - mainWrapper.getY());
-            overlayPanel.setSize(overlayPanel.getPreferredSize());
-            overlayPanel.setLocation((main.getWidth() - overlayPanel.getWidth()) / 2,
-                    (main.getHeight() - overlayPanel.getHeight()) / 4);
-        }
-
-        @Override
-        public String getDisplayName() {
-            return visualization.getDisplayName();
-        }
-
-        @Override
-        public void started() {
-            visualization.getMainComponent().setEnabled(false);
-            overlay.setText("Loading");
-            resizeOverlay();
-            overlayPanel.setVisible(true);
-        }
-
-        @Override
-        public void update(T model) {
-            overlayPanel.setVisible(false);
-            button.setText("Refresh");
-            resizeOverlay();
-            visualization.getMainComponent().setEnabled(true);
-            visualization.update(model);
-        }
-
-        @Override
-        public void failed() {
-            overlay.setText("Failed");
-        }
-
-        public JButton getLaunchButton() {
-            return button;
-        }
-
-        public JComponent getMainComponent() {
-            return main;
-        }
-    }
-
     private class BuildAction<T> implements ActionListener {
         private final ToolingOperation<? extends T> operation;
-        private final ProgressAwareVisualization<? super T> visualization;
 
         protected BuildAction(ToolingOperation<T> operation) {
             this.operation = operation;
-            visualization = null;
-        }
-
-        protected BuildAction(ToolingOperation<? extends T> operation, ProgressAwareVisualization<? super T> visualization) {
-            this.operation = operation;
-            this.visualization = visualization;
         }
 
         public void actionPerformed(ActionEvent actionEvent) {
-            if (visualization == null) {
-                executer.start(operation);
-            } else {
-                executer.start(operation, visualization);
-            }
+            executer.start(operation);
         }
     }
 
