@@ -1,9 +1,9 @@
 package net.rubygrapefruit.gradle.gui;
 
-import net.rubygrapefruit.gradle.gui.actions.FetchModel;
+import net.rubygrapefruit.gradle.gui.actions.FetchModelOperation;
 import net.rubygrapefruit.gradle.gui.actions.MultiModel;
-import net.rubygrapefruit.gradle.gui.actions.RunBuildAction;
-import net.rubygrapefruit.gradle.gui.actions.RunBuildActionAction;
+import net.rubygrapefruit.gradle.gui.actions.RunBuildActionOperation;
+import net.rubygrapefruit.gradle.gui.actions.RunBuildOperation;
 import net.rubygrapefruit.gradle.gui.visualizations.*;
 import org.gradle.tooling.CancellationTokenSource;
 import org.gradle.tooling.GradleConnector;
@@ -57,18 +57,19 @@ public class UI {
     private final PrintStream originalStdOut;
     private final PrintStream originalStdErr;
     private final JComboBox<Object> gradleVersion;
+    private final OperationExecuter executer = new OperationExecuter();
 
     public UI() {
         originalStdOut = System.out;
         originalStdErr = System.err;
         runBuild = new JButton("Build");
         cancel = new JButton("Cancel");
-        VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModel<>(GradleBuild.class), new ProjectTree());
-        VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModel<>(BuildInvocations.class), new TasksTable());
-        VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModel<>(BuildEnvironment.class), new BuildEnvironmentReport());
-        VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModel<>(EclipseProject.class), new EclipseModelReport());
-        VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModel<>(IdeaProject.class), new IdeaModelReport());
-        VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionAction(), new MultiModelReport());
+        VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new ProjectTree());
+        VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModelOperation<>(BuildInvocations.class), new TasksTable());
+        VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModelOperation<>(BuildEnvironment.class), new BuildEnvironmentReport());
+        VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModelOperation<>(EclipseProject.class), new EclipseModelReport());
+        VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModelOperation<>(IdeaProject.class), new IdeaModelReport());
+        VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionOperation(), new MultiModelReport());
         panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject, multiModel);
         buttons = new ArrayList<>();
         buttons.add(runBuild);
@@ -121,9 +122,9 @@ public class UI {
         panel.addTab("Tests", testsView);
 
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
-        commandLineArgs.addActionListener(new BuildAction<>(new RunBuildAction()));
+        commandLineArgs.addActionListener(new BuildAction<>(new RunBuildOperation()));
         panel.addToolbarControl(runBuild);
-        runBuild.addActionListener(new BuildAction<>(new RunBuildAction()));
+        runBuild.addActionListener(new BuildAction<>(new RunBuildOperation()));
         panel.addToolbarControl(cancel);
         cancel.addActionListener(new CancelListener());
         for (VisualizationPanel visualizationPanel : panels) {
@@ -255,25 +256,7 @@ public class UI {
 
         protected BuildAction(ToolingOperation<T> operation) {
             this.operation = operation;
-            visualization = new ProgressAwareVisualization<T>() {
-                public String getDisplayName() {
-                    return null;
-                }
-
-                public void started() {
-                    panel.showConsole();
-                }
-
-                public JComponent getMainComponent() {
-                    return null;
-                }
-
-                public void failed() {
-                }
-
-                public void update(T result) {
-                }
-            };
+            visualization = null;
         }
 
         protected BuildAction(ToolingOperation<? extends T> operation, ProgressAwareVisualization<? super T> visualization) {
@@ -282,6 +265,41 @@ public class UI {
         }
 
         public void actionPerformed(ActionEvent actionEvent) {
+            if (visualization == null) {
+                executer.start(operation);
+            } else {
+                executer.start(operation, visualization);
+            }
+        }
+    }
+
+    private class OperationExecuter implements ToolingOperationExecuter {
+        @Override
+        public void start(ToolingOperation<?> operation) {
+            start(operation, new ProgressAwareVisualization<Object>() {
+                        public String getDisplayName() {
+                            return null;
+                        }
+
+                        public void started() {
+                            panel.showConsole();
+                        }
+
+                        public JComponent getMainComponent() {
+                            return null;
+                        }
+
+                        public void failed() {
+                        }
+
+                        public void update(Object result) {
+                        }
+                    }
+            );
+        }
+
+        @Override
+        public <T> void start(ToolingOperation<T> operation, ProgressAwareVisualization<? super T> visualization) {
             final File userHome = userHomeDir.getFile();
             final File projectDir = projectDirSelector.getFile();
             final File distribution;
@@ -305,8 +323,12 @@ public class UI {
             final CancellationTokenSource tokenSource = GradleConnector.newCancellationTokenSource();
             token.set(tokenSource);
             AtomicReference<ProjectConnection> connectionRef = new AtomicReference<>();
-            final UIContext uiContext = new UIContext(projectDir, distribution, isEmbedded, console.getOutput(),
-                    Arrays.asList(commandLine)) {
+            final ToolingOperationContext uiContext = new ToolingOperationContext() {
+                @Override
+                public List<String> getCommandLineArgs() {
+                    return Arrays.asList(splitJvmArgs);
+                }
+
                 @Override
                 public <T extends LongRunningOperation> T create(OperationProvider<T> provider) {
                     T operation = provider.create(connectionRef.get());

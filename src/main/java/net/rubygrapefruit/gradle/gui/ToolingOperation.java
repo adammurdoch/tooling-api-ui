@@ -1,10 +1,14 @@
 package net.rubygrapefruit.gradle.gui;
 
+/**
+ * Some asynchronous tooling API operation.
+ * @param <T>
+ */
 public interface ToolingOperation<T> {
-    String getDisplayName(UIContext uiContext);
+    String getDisplayName(ToolingOperationContext uiContext);
 
     /**
      * Executes this operation and returns some result. Called from a non-UI thread.
      */
-    T run(UIContext uiContext);
+    T run(ToolingOperationContext uiContext);
 }
