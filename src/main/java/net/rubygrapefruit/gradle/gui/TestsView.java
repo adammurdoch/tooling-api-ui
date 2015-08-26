@@ -20,6 +20,7 @@ public class TestsView extends JPanel implements ProgressListener {
     public TestsView(ToolingOperationExecuter executer) {
         setLayout(new BorderLayout());
         JTextField testNames = new JTextField();
+        testNames.setToolTipText("Comma-separated test class or test method names");
         testNames.addActionListener(e -> {
             final String[] tests = (testNames.getText().split(",?\\s+"));
             executer.start(new ToolingOperation<Object>() {
@@ -31,7 +32,14 @@ public class TestsView extends JPanel implements ProgressListener {
                 @Override
                 public Object run(ToolingOperationContext uiContext) {
                     TestLauncher testLauncher = uiContext.create(projectConnection -> projectConnection.newTestLauncher());
-                    testLauncher.withJvmTestClasses(tests);
+                    for (String test : tests) {
+                        if (test.matches("[^\\.]+\\.[^\\.]+")) {
+                            String[] parts = test.split("\\.");
+                            testLauncher.withJvmTestMethods(parts[0], parts[1]);
+                        } else {
+                            testLauncher.withJvmTestClasses(test);
+                        }
+                    }
                     testLauncher.run();
                     return null;
                 }
