@@ -10,6 +10,18 @@ public class EclipseModelReport extends Report<EclipseProject> {
     @Override
     protected void render(EclipseProject project, StructureVisitor tree) {
         tree.struct("Project", project.getName(), () -> {
+            tree.collection("Source directories", project.getSourceDirectories(), srcDir -> {
+                tree.struct("Path " + srcDir.getPath(), srcDir, entry -> {
+                    tree.value("Directory", srcDir.getDirectory());
+                });
+            });
+            tree.collection("Linked resources", project.getLinkedResources(), linkedResource -> {
+                tree.struct("Path " + linkedResource.getName(), linkedResource, entry -> {
+                    tree.value("Location", linkedResource.getLocation());
+                    tree.value("Location URI", linkedResource.getLocationUri());
+                    tree.value("Link type", linkedResource.getType());
+                });
+            });
             tree.collection("Dependencies", project.getProjectDependencies(), dependency -> {
                 tree.struct(dependency.getTargetProject().getName(), dependency, eclipseDependency -> {
                     tree.value("Exported", eclipseDependency.isExported());
