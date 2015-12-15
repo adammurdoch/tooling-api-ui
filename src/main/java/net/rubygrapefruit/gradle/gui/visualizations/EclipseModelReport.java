@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public class EclipseModelReport extends Report<EclipseProject> {
+public class EclipseModelReport extends IdeModelReport<EclipseProject> {
     public EclipseModelReport() {
         super("Eclipse model");
     }
@@ -18,6 +18,7 @@ public class EclipseModelReport extends Report<EclipseProject> {
 
         for (EclipseProject project : projects) {
             tree.struct("Project", project.getName(), () -> {
+                renderJavaSettings(project, tree);
                 tree.collection("Source directories", project.getSourceDirectories(), srcDir -> {
                     tree.struct("Path " + srcDir.getPath(), srcDir, entry -> {
                         tree.value("Directory", srcDir.getDirectory());
@@ -49,10 +50,6 @@ public class EclipseModelReport extends Report<EclipseProject> {
                 tree.collection("Builders", project.getBuildCommands(), buildCommand -> {
                     tree.value(buildCommand.getName());
                 });
-                if (project.getJavaSourceSettings() != null) {
-                    tree.value("Java source level",
-                            project.getJavaSourceSettings().getSourceLanguageLevel().getVersion());
-                }
                 tree.collection("Children", project.getChildren(), child -> {
                     tree.value("name", child.getName());
                 });
