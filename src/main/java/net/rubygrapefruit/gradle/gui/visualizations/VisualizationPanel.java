@@ -71,11 +71,16 @@ public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
 
     @Override
     public void update(T model) {
-        overlayPanel.setVisible(false);
         button.setText("Refresh");
+        try {
+            visualization.update(model);
+        } catch (RuntimeException e) {
+            overlay.setText("Failed");
+            throw e;
+        }
+        overlayPanel.setVisible(false);
         resizeOverlay();
         visualization.getMainComponent().setEnabled(true);
-        visualization.update(model);
     }
 
     @Override
