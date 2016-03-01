@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public class EclipseModelReport extends IdeModelReport<EclipseProject> {
+public class EclipseModelReport extends Report<EclipseProject> {
     public EclipseModelReport() {
         super("Eclipse model");
     }
@@ -18,7 +18,16 @@ public class EclipseModelReport extends IdeModelReport<EclipseProject> {
 
         for (EclipseProject project : projects) {
             tree.struct("Project", project.getName(), () -> {
-                renderJavaSettings(project, tree);
+                if (project.getJavaSourceSettings() != null) {
+                    tree.value("Java source version",
+                            project.getJavaSourceSettings().getSourceLanguageLevel());
+                    tree.value("Java target version",
+                            project.getJavaSourceSettings().getTargetBytecodeVersion());
+                    tree.value("Build JDK version",
+                            project.getJavaSourceSettings().getJdk().getJavaVersion());
+                    tree.value("Build JDK home",
+                            project.getJavaSourceSettings().getJdk().getJavaHome());
+                }
                 tree.collection("Source directories", project.getSourceDirectories(), srcDir -> {
                     tree.struct("Path " + srcDir.getPath(), srcDir, entry -> {
                         tree.value("Directory", srcDir.getDirectory());
@@ -31,8 +40,8 @@ public class EclipseModelReport extends IdeModelReport<EclipseProject> {
                         tree.value("Link type", linkedResource.getType());
                     });
                 });
-                tree.collection("Dependencies", project.getProjectDependencies(), dependency -> {
-                    tree.struct(dependency.getTargetProject().getName(), dependency, eclipseDependency -> {
+                tree.collection("Project dependencies", project.getProjectDependencies(), dependency -> {
+                    tree.struct("Project " + dependency.getTargetProject().getName(), dependency, eclipseDependency -> {
                         tree.value("Exported", eclipseDependency.isExported());
                     });
                 });
@@ -50,8 +59,8 @@ public class EclipseModelReport extends IdeModelReport<EclipseProject> {
                 tree.collection("Builders", project.getBuildCommands(), buildCommand -> {
                     tree.value(buildCommand.getName());
                 });
-                tree.collection("Children", project.getChildren(), child -> {
-                    tree.value("name", child.getName());
+                tree.collection("Child projects", project.getChildren(), child -> {
+                    tree.value("Project " + child.getName());
                 });
             });
         }
