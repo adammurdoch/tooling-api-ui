@@ -1,7 +1,6 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
 import java.util.Collection;
-import java.util.Map;
 import java.util.function.Consumer;
 
 public interface StructureVisitor {
@@ -16,6 +15,4 @@ public interface StructureVisitor {
     void collection(String name, Collection<?> collection);
 
     <T> void collection(String name, Collection<T> collection, Consumer<T> renderer);
-
-    void map(String name, Map<String, ?> map);
 }
