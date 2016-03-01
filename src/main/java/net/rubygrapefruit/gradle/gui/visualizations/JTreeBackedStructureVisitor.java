@@ -1,6 +1,7 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
 import javax.swing.*;
+import java.io.File;
 import java.util.Collection;
 import java.util.function.Consumer;
 
@@ -21,12 +22,25 @@ public class JTreeBackedStructureVisitor implements StructureVisitor {
 
     @Override
     public void value(Object value) {
-        tree.node(value);
+        tree.node(format(value));
+    }
+
+    private String format(Object value) {
+        if (value == null) {
+            return "(null)";
+        }
+        if (value instanceof File) {
+            File file = (File) value;
+            if (file.isFile()) {
+                return String.format("%s (%s)", file.getName(), file.getPath());
+            }
+        }
+        return value.toString();
     }
 
     @Override
     public void value(String name, Object value) {
-        tree.node(String.format("%s: %s", name, value));
+        tree.node(String.format("%s: %s", name, format(value)));
     }
 
     @Override

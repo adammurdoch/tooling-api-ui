@@ -50,7 +50,7 @@ public class EclipseModelReport extends Report<EclipseProject> {
                             entry.getGradleModuleVersion().getName(), entry.getGradleModuleVersion().getVersion());
                     tree.struct(coords, entry, externalDependency -> {
                         tree.value("Exported", externalDependency.isExported());
-                        tree.value("File", externalDependency.getFile().getName());
+                        tree.value("File", externalDependency.getFile());
                     });
                 });
                 tree.collection("Natures", project.getProjectNatures(), nature -> {
