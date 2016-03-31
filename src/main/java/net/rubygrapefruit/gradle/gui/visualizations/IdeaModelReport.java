@@ -1,10 +1,11 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
-import org.gradle.jarjar.com.google.common.base.Function;
 import org.gradle.tooling.model.idea.IdeaJavaLanguageSettings;
 import org.gradle.tooling.model.idea.IdeaModuleDependency;
 import org.gradle.tooling.model.idea.IdeaProject;
 import org.gradle.tooling.model.idea.IdeaSingleEntryLibraryDependency;
+
+import java.util.function.Function;
 
 public class IdeaModelReport extends Report<IdeaProject> {
     public IdeaModelReport() {
