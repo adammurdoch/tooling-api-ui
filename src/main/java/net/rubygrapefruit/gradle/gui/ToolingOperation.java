@@ -5,6 +5,9 @@ package net.rubygrapefruit.gradle.gui;
  * @param <T>
  */
 public interface ToolingOperation<T> {
+    /**
+     * Called from UI thread.
+     */
     String getDisplayName(ToolingOperationContext uiContext);
 
     /**

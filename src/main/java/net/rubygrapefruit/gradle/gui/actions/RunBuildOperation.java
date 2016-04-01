@@ -12,7 +12,12 @@ public class RunBuildOperation implements ToolingOperation<Void> {
 
     @Override
     public Void run(ToolingOperationContext uiContext) {
-        BuildLauncher launcher = uiContext.create(projectConnection -> projectConnection.newBuild());
+        BuildLauncher launcher;
+        if (uiContext.isComposite()) {
+            launcher = uiContext.createComposite(connection -> connection.newBuild());
+        } else {
+            launcher = uiContext.create(connection -> connection.newBuild());
+        }
         launcher.run();
         return null;
     }

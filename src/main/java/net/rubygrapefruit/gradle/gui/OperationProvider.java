@@ -1,8 +1,7 @@
 package net.rubygrapefruit.gradle.gui;
 
 import org.gradle.tooling.LongRunningOperation;
-import org.gradle.tooling.ProjectConnection;
 
-public interface OperationProvider<T extends LongRunningOperation> {
-    T create(ProjectConnection projectConnection);
+public interface OperationProvider<T extends LongRunningOperation, CONNECTION> {
+    T create(CONNECTION projectConnection);
 }
