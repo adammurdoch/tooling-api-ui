@@ -9,8 +9,6 @@ import org.gradle.tooling.CancellationTokenSource;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.LongRunningOperation;
 import org.gradle.tooling.ProjectConnection;
-import org.gradle.tooling.connection.GradleConnection;
-import org.gradle.tooling.connection.GradleConnectionBuilder;
 import org.gradle.tooling.events.OperationType;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
 import org.gradle.tooling.model.build.BuildEnvironment;
@@ -59,7 +57,6 @@ public class UI {
     private final PrintStream originalStdErr;
     private final JComboBox<Object> gradleVersion;
     private final OperationExecuter executer = new OperationExecuter();
-    private final JComboBox<Invocation> invocation;
     private final Executor executionPool = Executors.newCachedThreadPool();
 
     public UI() {
@@ -96,12 +93,6 @@ public class UI {
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
         gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
-        invocation = new JComboBox<>(Invocation.values());
-    }
-
-    enum Invocation {
-        ProjectConnection,
-        GradleConnection
     }
 
     public static void main(String[] args) {
@@ -122,7 +113,6 @@ public class UI {
         settings.addControl("User home directory", userHomeDir);
         color.setSelected(true);
         settings.addControl(color);
-        settings.addControl("Use API", invocation);
         settings.addControl(embedded);
         settings.addControl(verboseLogging);
         settings.addControl(shutdown);
@@ -232,7 +222,6 @@ public class UI {
                 distribution = null;
                 version = gradleVersion.getSelectedItem().toString();
             }
-            final boolean isProjectConnection = invocation.getSelectedItem() == Invocation.ProjectConnection;
             final boolean isColor = color.isSelected();
             final boolean isEmbedded = embedded.isSelected();
             final boolean isVerbose = verboseLogging.isSelected();
@@ -241,7 +230,6 @@ public class UI {
             final CancellationTokenSource tokenSource = GradleConnector.newCancellationTokenSource();
             token.set(tokenSource);
             AtomicReference<ProjectConnection> projectConnectionRef = new AtomicReference<>();
-            AtomicReference<GradleConnection> gradleConnectionRef = new AtomicReference<>();
             final ToolingOperationContext uiContext = new ToolingOperationContext() {
                 @Override
                 public List<String> getCommandLineArgs() {
@@ -249,26 +237,10 @@ public class UI {
                 }
 
                 @Override
-                public boolean isComposite() {
-                    return gradleConnectionRef.get() != null;
-                }
-
-                @Override
                 public <T extends LongRunningOperation> T create(OperationProvider<T, ProjectConnection> provider) {
                     ProjectConnection connection = projectConnectionRef.get();
                     if (connection == null) {
                         throw new IllegalStateException("Not using ProjectConnection API");
-                    }
-                    T operation = provider.create(connection);
-                    setup(operation);
-                    return operation;
-                }
-
-                @Override
-                public <T extends LongRunningOperation> T createComposite(OperationProvider<T, GradleConnection> provider) {
-                    GradleConnection connection = gradleConnectionRef.get();
-                    if (connection == null) {
-                        throw new IllegalStateException("Not using GradleConnection API");
                     }
                     T operation = provider.create(connection);
                     setup(operation);
@@ -302,59 +274,33 @@ public class UI {
                 Throwable failure = null;
                 T result = null;
                 try {
-                    if (!isProjectConnection) {
-                        System.out.println("Using GradleConnection API");
-                        GradleConnectionBuilder builder = GradleConnector.newGradleConnection();
-                        if (userHome != null) {
-                            builder.useGradleUserHomeDir(userHome);
+                    System.out.println("Using ProjectConnection API");
+                    DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
+                    if (userHome != null) {
+                        connector.useGradleUserHomeDir(userHome);
+                    }
+                    if (distribution != null) {
+                        if (distribution.isDirectory()) {
+                            connector.useInstallation(distribution);
+                        } else {
+                            connector.useDistribution(distribution.toURI());
                         }
-                        GradleConnectionBuilder.ParticipantBuilder participant = builder.addParticipant(projectDir);
-                        if (distribution != null) {
-                            if (distribution.isDirectory()) {
-                                participant.useInstallation(distribution);
-                            } else {
-                                participant.useDistribution(distribution.toURI());
-                            }
-                        }
-                        if (version != null) {
-                            participant.useGradleVersion(version);
-                        }
-                        GradleConnection gradleConnection = builder.build();
-                        gradleConnectionRef.set(gradleConnection);
-                        try {
-                            result = operation.run(uiContext);
-                        } finally {
-                            gradleConnection.close();
-                        }
-                    } else {
-                        System.out.println("Using ProjectConnection API");
-                        DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
-                        if (userHome != null) {
-                            connector.useGradleUserHomeDir(userHome);
-                        }
-                        if (distribution != null) {
-                            if (distribution.isDirectory()) {
-                                connector.useInstallation(distribution);
-                            } else {
-                                connector.useDistribution(distribution.toURI());
-                            }
-                        }
-                        if (version != null) {
-                            connector.useGradleVersion(version);
-                        }
-                        if (isEmbedded) {
-                            connector.embedded(true);
-                        }
-                        if (isVerbose) {
-                            connector.setVerboseLogging(true);
-                        }
-                        ProjectConnection connection = connector.forProjectDirectory(projectDir).connect();
-                        try {
-                            projectConnectionRef.set(connection);
-                            result = operation.run(uiContext);
-                        } finally {
-                            connection.close();
-                        }
+                    }
+                    if (version != null) {
+                        connector.useGradleVersion(version);
+                    }
+                    if (isEmbedded) {
+                        connector.embedded(true);
+                    }
+                    if (isVerbose) {
+                        connector.setVerboseLogging(true);
+                    }
+                    ProjectConnection connection = connector.forProjectDirectory(projectDir).connect();
+                    try {
+                        projectConnectionRef.set(connection);
+                        result = operation.run(uiContext);
+                    } finally {
+                        connection.close();
                     }
                 } catch (Throwable t) {
                     log.getError().println("FAILED WITH EXCEPTION");
