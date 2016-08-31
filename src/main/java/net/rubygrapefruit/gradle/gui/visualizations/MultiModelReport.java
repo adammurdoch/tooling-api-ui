@@ -20,13 +20,12 @@ public class MultiModelReport extends Report<MultiModel> {
 
         EclipseProject eclipseProject = model.eclipseProject;
         tree.struct("Eclipse", eclipseProject.getName(), () -> {
-            tree.value("Project directory", eclipseProject.getProjectDirectory());
+            new EclipseModelReport().render(eclipseProject, tree);
         });
 
         IdeaProject ideaProject = model.ideaProject;
         tree.struct("IDEA", ideaProject.getName(), () -> {
-            tree.value("JDK", ideaProject.getJdkName());
-            tree.value("Java language", ideaProject.getLanguageLevel().getLevel());
+            new IdeaModelReport().render(ideaProject, tree);
         });
     }
 }
