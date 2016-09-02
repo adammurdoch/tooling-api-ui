@@ -81,7 +81,7 @@ public class IdeaModelReport extends Report<IdeaProject> {
                     tree.collection("Dependencies", module.getDependencies(), dependency -> {
                         if (dependency instanceof IdeaModuleDependency) {
                             IdeaModuleDependency moduleDependency = (IdeaModuleDependency) dependency;
-                            tree.struct(String.format("Module %s", moduleDependency.getTargetModuleName()), moduleDependency, dep -> {
+                            tree.struct(String.format("Module %s", moduleDependency.getDependencyModule().getName()), moduleDependency, dep -> {
                                 tree.value("Exported", dep.getExported());
                                 tree.value("Scope", dep.getScope().getScope());
                             });
