@@ -13,10 +13,10 @@ public class BuildEventTree extends JPanel implements ProgressListener {
     private final DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode();
     private final Map<OperationDescriptor, DefaultMutableTreeNode> operations = new HashMap<>();
     private final DefaultTreeModel model = new DefaultTreeModel(rootNode);
-    private final SettingsPanel detail = new SettingsPanel();
     private final JLabel eventDisplayName = new JLabel();
     private final JLabel operationName = new JLabel();
     private final JLabel operationDisplayName = new JLabel();
+    private final JLabel duration = new JLabel();
     private final JTree tree = new JTree();
 
     public BuildEventTree() {
@@ -35,23 +35,28 @@ public class BuildEventTree extends JPanel implements ProgressListener {
                     eventDisplayName.setText(event.getDisplayName());
                     operationName.setText(event.getDescriptor().getName());
                     operationDisplayName.setText(event.getDescriptor().getDisplayName());
+                    duration.setText("");
                     return;
                 } else if (object instanceof FinishEvent) {
                     FinishEvent event = (FinishEvent) object;
                     eventDisplayName.setText(event.getDisplayName());
                     operationName.setText(event.getDescriptor().getName());
                     operationDisplayName.setText(event.getDescriptor().getDisplayName());
+                    duration.setText(String.valueOf(event.getResult().getEndTime() - event.getResult().getStartTime()) + " ms");
                     return;
                 }
             }
             eventDisplayName.setText("");
             operationName.setText("");
             operationDisplayName.setText("");
+            duration.setText("");
         });
 
+        SettingsPanel detail = new SettingsPanel();
         detail.addControl("Event display name", eventDisplayName);
         detail.addControl("Operation name", operationName);
         detail.addControl("Operation display name", operationDisplayName);
+        detail.addControl("Duration", duration);
 
         add(new JScrollPane(tree), BorderLayout.CENTER);
         add(detail, BorderLayout.SOUTH);
