@@ -16,6 +16,7 @@ import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.gradle.BuildInvocations;
 import org.gradle.tooling.model.gradle.GradleBuild;
 import org.gradle.tooling.model.idea.IdeaProject;
+import org.gradle.util.GradleVersion;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;
@@ -58,6 +59,7 @@ public class UI {
     private final JComboBox<Object> gradleVersion;
     private final OperationExecuter executer = new OperationExecuter();
     private final Executor executionPool = Executors.newCachedThreadPool();
+    private final JLabel tapiVersion;
 
     public UI() {
         originalStdOut = System.out;
@@ -92,7 +94,8 @@ public class UI {
         embedded = new JCheckBox("Run build in-process (internal)");
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
-        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
+        tapiVersion = new JLabel(GradleVersion.current().getVersion());
+        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
     }
 
     public static void main(String[] args) {
@@ -104,6 +107,7 @@ public class UI {
         frame.setContentPane(panel);
 
         SettingsPanel settings = panel.getSettings();
+        settings.addControl("Tooling API version", tapiVersion);
         projectDirSelector.setFile(new File("/Users/adam/gradle/test-projects/tooling"));
         settings.addControl("Project directory", projectDirSelector);
         settings.addControl("Gradle version", gradleVersion);
