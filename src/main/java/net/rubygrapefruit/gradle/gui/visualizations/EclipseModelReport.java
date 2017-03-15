@@ -41,7 +41,7 @@ public class EclipseModelReport extends Report<EclipseProject> {
                     });
                 });
                 tree.collection("Project dependencies", project.getProjectDependencies(), dependency -> {
-                    tree.struct("Project " + dependency.getTargetProject().getName(), dependency, eclipseDependency -> {
+                    tree.struct("Project " + dependency.getPath(), dependency, eclipseDependency -> {
                         tree.value("Exported", eclipseDependency.isExported());
                     });
                 });
