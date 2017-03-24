@@ -95,7 +95,7 @@ public class UI {
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
         tapiVersion = new JLabel(GradleVersion.current().getVersion());
-        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
+        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "3.4.1", "3.4", "3.3", "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
     }
 
     public static void main(String[] args) {
