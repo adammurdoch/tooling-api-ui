@@ -30,19 +30,19 @@ public class BuildEventTree extends JPanel implements ProgressListener {
             if (e.isAddedPath()) {
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) e.getPath().getLastPathComponent();
                 Object object = node.getUserObject();
-                if (object instanceof StartEvent) {
-                    StartEvent event = (StartEvent) object;
-                    eventDisplayName.setText(event.getDisplayName());
-                    operationName.setText(event.getDescriptor().getName());
-                    operationDisplayName.setText(event.getDescriptor().getDisplayName());
-                    duration.setText("");
-                    return;
-                } else if (object instanceof FinishEvent) {
+                if (object instanceof FinishEvent) {
                     FinishEvent event = (FinishEvent) object;
                     eventDisplayName.setText(event.getDisplayName());
                     operationName.setText(event.getDescriptor().getName());
                     operationDisplayName.setText(event.getDescriptor().getDisplayName());
                     duration.setText(String.valueOf(event.getResult().getEndTime() - event.getResult().getStartTime()) + " ms");
+                    return;
+                } else if (object instanceof ProgressEvent) {
+                    ProgressEvent event = (ProgressEvent) object;
+                    eventDisplayName.setText(event.getDisplayName());
+                    operationName.setText(event.getDescriptor().getName());
+                    operationDisplayName.setText(event.getDescriptor().getDisplayName());
+                    duration.setText("");
                     return;
                 }
             }
@@ -98,6 +98,17 @@ public class BuildEventTree extends JPanel implements ProgressListener {
             operationNode = operations.get(event.getDescriptor());
             operationNode.setUserObject(finishEvent);
             model.nodeChanged(operationNode);
+        } else if (event instanceof StatusEvent) {
+            DefaultMutableTreeNode parentNode = operations.get(event.getDescriptor());
+            if (parentNode.getChildCount() > 0 && ((DefaultMutableTreeNode) parentNode.getLastChild()).getUserObject() instanceof StatusEvent) {
+                operationNode = ((DefaultMutableTreeNode) parentNode.getLastChild());
+                operationNode.setUserObject(event);
+                model.nodeChanged(operationNode);
+            } else {
+                operationNode = new DefaultMutableTreeNode(event);
+                model.insertNodeInto(operationNode, parentNode, parentNode.getChildCount());
+                tree.expandPath(new TreePath(parentNode.getPath()));
+            }
         } else {
             // Ignore
             return;
@@ -140,6 +151,10 @@ public class BuildEventTree extends JPanel implements ProgressListener {
                     } else {
                         setText(event.getDescriptor().getName() + " (unknown result)");
                     }
+                } else if (object instanceof StatusEvent) {
+                    StatusEvent event = (StatusEvent) object;
+                    int percent = (int)((double) event.getProgress() / event.getTotal() * 100);
+                    setText(event.getDescriptor().getName() + " (" + event.getProgress() + "/" + event.getTotal() + " " + percent + "%)");
                 }
             }
             return this;
