@@ -134,6 +134,16 @@ public class ConsolePanel extends JPanel {
                 cursorPos = Math.min(para.getStartOffset() + pos, para.getEndOffset());
                 continue;
             }
+            if (event instanceof CursorDown) {
+                CursorDown cursorDown = (CursorDown) event;
+                Element para = document.getParagraphElement(cursorPos);
+                int pos = cursorPos - para.getStartOffset();
+                for (int i = 0; i < cursorDown.count; i++) {
+                    para = document.getParagraphElement(para.getEndOffset() + 1);
+                }
+                cursorPos = Math.min(para.getStartOffset() + pos, para.getEndOffset());
+                continue;
+            }
 
             if (event instanceof EraseToEndOfLine) {
                 try {
@@ -142,6 +152,16 @@ public class ConsolePanel extends JPanel {
                     }
                     Element para = document.getParagraphElement(cursorPos);
                     document.remove(cursorPos, Math.min(document.getLength(), para.getEndOffset()) - cursorPos);
+                } catch (BadLocationException e) {
+                    throw new RuntimeException(e);
+                }
+                continue;
+            }
+            if (event instanceof EraseLine) {
+                try {
+                    Element para = document.getParagraphElement(cursorPos);
+                    document.remove(para.getStartOffset(), para.getElementCount());
+                    cursorPos = para.getStartOffset();
                 } catch (BadLocationException e) {
                     throw new RuntimeException(e);
                 }
@@ -239,6 +259,14 @@ public class ConsolePanel extends JPanel {
         }
     }
 
+    private class CursorDown extends Event {
+        final int count;
+
+        public CursorDown(int count) {
+            this.count = count;
+        }
+    }
+
     private class CursorForward extends Event {
         final int count;
 
@@ -248,6 +276,9 @@ public class ConsolePanel extends JPanel {
     }
 
     private class EraseToEndOfLine extends Event {
+    }
+
+    private class EraseLine extends Event {
     }
 
     private class Bold extends Event {
@@ -378,7 +409,7 @@ public class ConsolePanel extends JPanel {
             if (code == 'm' && param.equals("1")) {
                 onEvent(new Bold());
                 return true;
-            } else if (code == 'm' && param.equals("22")) {
+            } else if (code == 'm' && param.equals("22") || param.equals("")) {
                 onEvent(new Normal());
                 return true;
             } else if (code == 'm' && param.equals("22;1")) {
@@ -403,11 +434,17 @@ public class ConsolePanel extends JPanel {
             } else if (code == 'A') {
                 onEvent(new CursorUp(Integer.parseInt(param)));
                 return true;
+            } else if (code == 'B') {
+                onEvent(new CursorDown(Integer.parseInt(param)));
+                return true;
             } else if (code == 'C') {
                 onEvent(new CursorForward(Integer.parseInt(param)));
                 return true;
             } else if (code == 'K' && param.equals("0")) {
                 onEvent(new EraseToEndOfLine());
+                return true;
+            } else if (code == 'K' && param.equals("2")) {
+                onEvent(new EraseLine());
                 return true;
             }
             return false;
