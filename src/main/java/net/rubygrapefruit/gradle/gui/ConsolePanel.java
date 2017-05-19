@@ -173,7 +173,12 @@ public class ConsolePanel extends JPanel {
             ColorScheme currentScheme = colorScheme != null ? colorScheme : text.colorScheme;
             Style style = bold ? currentScheme.getBold() : currentScheme.getNormal();
             try {
-                // TODO - need to overwrite existing text on the current line
+                Element para = document.getParagraphElement(cursorPos);
+                int remove = Math.min(para.getEndOffset() - cursorPos - 1, text.text.length());
+                if (remove > 0) {
+                    document.remove(cursorPos, remove);
+                    // TODO - need to deal with multiple lines in the text
+                }
                 document.insertString(cursorPos, text.text, style);
             } catch (BadLocationException e) {
                 throw new RuntimeException(e);
@@ -419,13 +424,25 @@ public class ConsolePanel extends JPanel {
             } else if (code == 'm' && param.equals("31")) {
                 onEvent(new ForegroundColor(ansiRed));
                 return true;
+            } else if (code == 'm' && param.equals("31;1")) {
+                onEvent(new ForegroundColor(ansiRed));
+                onEvent(new Bold());
+                return true;
             } else if (code == 'm' && param.equals("32")) {
                 onEvent(new ForegroundColor(ansiGreen));
+                return true;
+            } else if (code == 'm' && param.equals("32;1")) {
+                onEvent(new ForegroundColor(ansiGreen));
+                onEvent(new Bold());
                 return true;
             } else if (code == 'm' && param.equals("33")) {
                 onEvent(new ForegroundColor(ansiYellow));
                 return true;
             } else if (code == 'm' && param.equals("39")) {
+                onEvent(new ForegroundColor(null));
+                return true;
+            } else if (code == 'm' && param.equals("0;39")) {
+                onEvent(new Normal());
                 onEvent(new ForegroundColor(null));
                 return true;
             } else if (code == 'D') {
