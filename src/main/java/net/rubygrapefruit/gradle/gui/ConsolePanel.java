@@ -1,5 +1,10 @@
 package net.rubygrapefruit.gradle.gui;
 
+import net.rubygrapefruit.ansi.AnsiParser;
+import net.rubygrapefruit.ansi.TextColor;
+import net.rubygrapefruit.ansi.Visitor;
+import net.rubygrapefruit.ansi.token.*;
+
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
@@ -10,21 +15,22 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ConsolePanel extends JPanel {
-    private final ColorScheme knownEscape;
     private final ColorScheme unknownEscape;
     private final ColorScheme ansiRed;
     private final ColorScheme ansiGreen;
     private final ColorScheme ansiYellow;
+    private final ColorScheme normal;
+    private final boolean handleControlSequences;
     private boolean hasOutput;
     private final JTextPane output;
     private final PrintStream outputStream;
-    private final PrintStream errorStream;
-    private final BlockingQueue<Event> events = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Token> events = new LinkedBlockingQueue<>();
     private ColorScheme colorScheme;
     private boolean bold;
     private int cursorPos;
 
-    public ConsolePanel(boolean ansiAware) {
+    public ConsolePanel(boolean handleControlSequences) {
+        this.handleControlSequences = handleControlSequences;
         setLayout(new BorderLayout());
 
         output = new JTextPane();
@@ -33,7 +39,9 @@ public class ConsolePanel extends JPanel {
         output.setFont(new Font("monospaced", Font.PLAIN, 13));
         output.setText("output goes here..");
 
-        Style stdout = output.addStyle("stdout", null);
+        Style normal = output.addStyle("stdout", null);
+        this.normal = new BoldColorScheme(normal, output);
+        colorScheme = this.normal;
 
         Style red = output.addStyle("ansiRed", null);
         StyleConstants.setForeground(red, Color.RED);
@@ -55,15 +63,12 @@ public class ConsolePanel extends JPanel {
         Style knownEscape = output.addStyle("knownEscape", null);
         StyleConstants.setForeground(knownEscape, Color.WHITE);
         StyleConstants.setBackground(knownEscape, new Color(80, 127, 180));
-        this.knownEscape = new NoBoldColorScheme(knownEscape);
 
         add(output, BorderLayout.CENTER);
 
-        ByteConsumer stdoutSink = new AnsiByteConsumer(new BoldColorScheme(stdout, output));
-        ByteConsumer stderrSink = new AnsiByteConsumer(ansiRed);
-
-        outputStream = new PrintStream(new ConsolePanel.OutputWriter(stdoutSink), true);
-        errorStream = new PrintStream(new ConsolePanel.OutputWriter(stderrSink), true);
+        Visitor visitor = token -> onEvent(token);
+        AnsiParser parser = new AnsiParser();
+        outputStream = new PrintStream(new SyncOutputStream(parser.newParser("utf-8", visitor)), true);
     }
 
     public PrintStream getOutput() {
@@ -71,27 +76,14 @@ public class ConsolePanel extends JPanel {
     }
 
     public PrintStream getError() {
-        return errorStream;
+        return outputStream;
     }
 
     private void doWriteOutput() {
         while (true) {
-            Event event = events.poll();
+            Token event = events.poll();
             if (event == null) {
                 return;
-            }
-            if (event instanceof Bold) {
-                bold = true;
-                continue;
-            }
-            if (event instanceof Normal) {
-                bold = false;
-                continue;
-            }
-            if (event instanceof ForegroundColor) {
-                ForegroundColor color = (ForegroundColor) event;
-                colorScheme = color.colorScheme;
-                continue;
             }
 
             if (!hasOutput) {
@@ -99,95 +91,141 @@ public class ConsolePanel extends JPanel {
                 output.setEnabled(true);
                 hasOutput = true;
             }
-
             StyledDocument document = output.getStyledDocument();
 
-            if (event instanceof CursorBack) {
-                // TODO - handle moving back over end-of-line chars
-                CursorBack cursorBack = (CursorBack) event;
-                Element para = document.getParagraphElement(cursorPos);
-                cursorPos = Math.max(para.getStartOffset(), cursorPos - cursorBack.count);
-                continue;
-            }
+            if (handleControlSequences) {
+                if (event instanceof BoldOn) {
+                    bold = true;
+                    continue;
+                }
+                if (event instanceof BoldOff) {
+                    bold = false;
+                    continue;
+                }
+                if (event instanceof ForegroundColor) {
+                    ForegroundColor color = (ForegroundColor) event;
+                    if (color.getColor().isDefault()) {
+                        colorScheme = normal;
+                        continue;
+                    }
+                    if (color.getColor() == TextColor.RED) {
+                        colorScheme = ansiRed;
+                        continue;
+                    }
+                    if (color.getColor() == TextColor.GREEN) {
+                        colorScheme = ansiGreen;
+                        continue;
+                    }
+                    if (color.getColor() == TextColor.YELLOW) {
+                        colorScheme = ansiYellow;
+                        continue;
+                    }
+                    continue;
+                }
+                if (event instanceof BackgroundColor) {
+                    BackgroundColor color = (BackgroundColor) event;
+                    if (color.getColor().isDefault()) {
+                        continue;
+                    }
+                }
+                if (event instanceof CursorBackward) {
+                    // TODO - handle moving back over end-of-line chars
+                    CursorBackward cursorBack = (CursorBackward) event;
+                    Element para = document.getParagraphElement(cursorPos);
+                    cursorPos = Math.max(para.getStartOffset(), cursorPos - cursorBack.getCount());
+                    continue;
+                }
 
-            if (event instanceof CursorForward) {
-                // TODO - handle moving forward over end-of-line chars
-                CursorForward cursorForward = (CursorForward) event;
-                Element para = document.getParagraphElement(cursorPos);
-                cursorPos += cursorForward.count;
-                while (cursorPos >= para.getEndOffset()) {
+                if (event instanceof CursorForward) {
+                    // TODO - handle moving forward over end-of-line chars
+                    CursorForward cursorForward = (CursorForward) event;
+                    Element para = document.getParagraphElement(cursorPos);
+                    cursorPos += cursorForward.getCount();
+                    while (cursorPos >= para.getEndOffset()) {
+                        try {
+                            document.insertString(para.getEndOffset() - 1, " ", null);
+                        } catch (BadLocationException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    continue;
+                }
+                if (event instanceof CursorUp) {
+                    CursorUp cursorUp = (CursorUp) event;
+                    Element para = document.getParagraphElement(cursorPos);
+                    int pos = cursorPos - para.getStartOffset();
+                    for (int i = 0; i < cursorUp.getCount() && para.getStartOffset() > 0; i++) {
+                        para = document.getParagraphElement(para.getStartOffset() - 1);
+                    }
+                    cursorPos = Math.min(para.getStartOffset() + pos, para.getEndOffset());
+                    continue;
+                }
+                if (event instanceof CursorDown) {
+                    CursorDown cursorDown = (CursorDown) event;
+                    Element para = document.getParagraphElement(cursorPos);
+                    int pos = cursorPos - para.getStartOffset();
+                    for (int i = 0; i < cursorDown.getCount(); i++) {
+                        para = document.getParagraphElement(para.getEndOffset() + 1);
+                    }
+                    cursorPos = Math.min(para.getStartOffset() + pos, para.getEndOffset());
+                    continue;
+                }
+                if (event instanceof EraseToEndOfLine) {
                     try {
-                        document.insertString(para.getEndOffset() - 1, " ", null);
+                        if (cursorPos == document.getLength()) {
+                            continue;
+                        }
+                        Element para = document.getParagraphElement(cursorPos);
+                        document.remove(cursorPos, Math.min(document.getLength(), para.getEndOffset()) - cursorPos);
                     } catch (BadLocationException e) {
                         throw new RuntimeException(e);
                     }
+                    continue;
                 }
-                continue;
-            }
-            if (event instanceof CursorUp) {
-                CursorUp cursorUp = (CursorUp) event;
-                Element para = document.getParagraphElement(cursorPos);
-                int pos = cursorPos - para.getStartOffset();
-                for (int i = 0; i < cursorUp.count && para.getStartOffset() > 0; i++) {
-                    para = document.getParagraphElement(para.getStartOffset() - 1);
-                }
-                cursorPos = Math.min(para.getStartOffset() + pos, para.getEndOffset());
-                continue;
-            }
-            if (event instanceof CursorDown) {
-                CursorDown cursorDown = (CursorDown) event;
-                Element para = document.getParagraphElement(cursorPos);
-                int pos = cursorPos - para.getStartOffset();
-                for (int i = 0; i < cursorDown.count; i++) {
-                    para = document.getParagraphElement(para.getEndOffset() + 1);
-                }
-                cursorPos = Math.min(para.getStartOffset() + pos, para.getEndOffset());
-                continue;
-            }
-
-            if (event instanceof EraseToEndOfLine) {
-                try {
-                    if (cursorPos == document.getLength()) {
-                        continue;
+                if (event instanceof EraseInLine) {
+                    try {
+                        Element para = document.getParagraphElement(cursorPos);
+                        document.remove(para.getStartOffset(), para.getElementCount());
+                        cursorPos = para.getStartOffset();
+                    } catch (BadLocationException e) {
+                        throw new RuntimeException(e);
                     }
-                    Element para = document.getParagraphElement(cursorPos);
-                    document.remove(cursorPos, Math.min(document.getLength(), para.getEndOffset()) - cursorPos);
-                } catch (BadLocationException e) {
-                    throw new RuntimeException(e);
+                    continue;
                 }
-                continue;
-            }
-            if (event instanceof EraseLine) {
-                try {
-                    Element para = document.getParagraphElement(cursorPos);
-                    document.remove(para.getStartOffset(), para.getElementCount());
-                    cursorPos = para.getStartOffset();
-                } catch (BadLocationException e) {
-                    throw new RuntimeException(e);
-                }
-                continue;
             }
 
-            TextEvent text = (TextEvent) event;
+            String text;
+            ColorScheme currentScheme = colorScheme;
+            if (event instanceof Text) {
+                text = ((Text) event).getText();
+            } else if (event instanceof NewLine) {
+                text = "\n";
+            } else if (event instanceof CarriageReturn) {
+                text = "\r";
+            } else {
+                StringBuilder builder = new StringBuilder();
+                event.appendDiagnostic(builder);
+                text = builder.toString();
+                currentScheme = unknownEscape;
+            }
 
-            ColorScheme currentScheme = colorScheme != null ? colorScheme : text.colorScheme;
             Style style = bold ? currentScheme.getBold() : currentScheme.getNormal();
             try {
                 Element para = document.getParagraphElement(cursorPos);
-                int remove = Math.min(para.getEndOffset() - cursorPos - 1, text.text.length());
+                int remove = Math.min(para.getEndOffset() - cursorPos - 1, text.length());
                 if (remove > 0) {
                     document.remove(cursorPos, remove);
                     // TODO - need to deal with multiple lines in the text
                 }
-                document.insertString(cursorPos, text.text, style);
+                document.insertString(cursorPos, text, style);
             } catch (BadLocationException e) {
                 throw new RuntimeException(e);
             }
-            cursorPos += text.text.length();
+            cursorPos += text.length();
         }
     }
 
-    private void onEvent(Event event) {
+    private void onEvent(Token event) {
         events.add(event);
         if (SwingUtilities.isEventDispatchThread()) {
             doWriteOutput();
@@ -245,76 +283,11 @@ public class ConsolePanel extends JPanel {
         }
     }
 
-    private abstract class Event {
-    }
+    private class SyncOutputStream extends OutputStream {
+        private final OutputStream delegate;
 
-    private class CursorBack extends Event {
-        final int count;
-
-        public CursorBack(int count) {
-            this.count = count;
-        }
-    }
-
-    private class CursorUp extends Event {
-        final int count;
-
-        public CursorUp(int count) {
-            this.count = count;
-        }
-    }
-
-    private class CursorDown extends Event {
-        final int count;
-
-        public CursorDown(int count) {
-            this.count = count;
-        }
-    }
-
-    private class CursorForward extends Event {
-        final int count;
-
-        public CursorForward(int count) {
-            this.count = count;
-        }
-    }
-
-    private class EraseToEndOfLine extends Event {
-    }
-
-    private class EraseLine extends Event {
-    }
-
-    private class Bold extends Event {
-    }
-
-    private class Normal extends Event {
-    }
-
-    private class ForegroundColor extends Event {
-        final ColorScheme colorScheme;
-
-        public ForegroundColor(ColorScheme colorScheme) {
-            this.colorScheme = colorScheme;
-        }
-    }
-
-    private class TextEvent extends Event {
-        final String text;
-        final ColorScheme colorScheme;
-
-        private TextEvent(String text, ColorScheme colorScheme) {
-            this.text = text;
-            this.colorScheme = colorScheme;
-        }
-    }
-
-    private class OutputWriter extends OutputStream {
-        private final ByteConsumer sink;
-
-        public OutputWriter(ByteConsumer sink) {
-            this.sink = sink;
+        public SyncOutputStream(OutputStream delegate) {
+            this.delegate = delegate;
         }
 
         @Override
@@ -331,183 +304,18 @@ public class ConsolePanel extends JPanel {
 
         @Override
         public void write(byte[] bytes, int offset, int length) throws IOException {
-            synchronized (sink) {
-                sink.consume(new Buffer(bytes, offset, length));
+            synchronized (delegate) {
+                delegate.write(bytes, offset, length);
             }
         }
 
         @Override
         public void flush() throws IOException {
+            delegate.flush();
         }
 
         @Override
         public void close() throws IOException {
-        }
-    }
-
-    private interface ByteConsumer {
-        void consume(Buffer buffer);
-    }
-
-    enum State {
-        Normal, LeftParen, Param, Code
-    }
-
-    private class AnsiByteConsumer implements ByteConsumer {
-        private final StringBuilder currentSequence = new StringBuilder();
-        private final ColorScheme colorScheme;
-        private State state = State.Normal;
-
-        public AnsiByteConsumer(ColorScheme colorScheme) {
-            this.colorScheme = colorScheme;
-        }
-
-        @Override
-        public void consume(Buffer buffer) {
-            while (buffer.hasMore()) {
-                switch (state) {
-                    case LeftParen:
-                        if (buffer.peek() != '[') {
-                            onEvent(new TextEvent("ESC", unknownEscape));
-                            state = State.Normal;
-                        } else {
-                            buffer.consume();
-                            state = State.Param;
-                        }
-                        break;
-                    case Param:
-                        byte nextDigit = buffer.peek();
-                        if ((nextDigit < '0' || nextDigit > '9') && nextDigit != ';') {
-                            state = State.Code;
-                        } else {
-                            currentSequence.append((char) nextDigit);
-                            buffer.consume();
-                        }
-                        break;
-                    case Code:
-                        char next = (char) buffer.peek();
-                        buffer.consume();
-                        String string = currentSequence.toString();
-                        if (!handleEscape(string, next)) {
-                            onEvent(new TextEvent("ESC[" + string + next, unknownEscape));
-                        }
-                        state = State.Normal;
-                        break;
-                    case Normal:
-                        Buffer prefix = buffer.consumeToNext((byte) 27);
-                        if (prefix == null) {
-                            onEvent(new TextEvent(buffer.consumeString(), colorScheme));
-                            return;
-                        }
-                        onEvent(new TextEvent(prefix.consumeString(), colorScheme));
-                        state = State.LeftParen;
-                        buffer.consume();
-                        currentSequence.setLength(0);
-                        break;
-                    default:
-                        throw new IllegalStateException();
-                }
-            }
-        }
-
-        private boolean handleEscape(String param, char code) {
-            if (code == 'm' && param.equals("1")) {
-                onEvent(new Bold());
-                return true;
-            } else if (code == 'm' && param.equals("22") || param.equals("")) {
-                onEvent(new Normal());
-                return true;
-            } else if (code == 'm' && param.equals("22;1")) {
-                onEvent(new Normal());
-                onEvent(new Bold());
-                return true;
-            } else if (code == 'm' && param.equals("31")) {
-                onEvent(new ForegroundColor(ansiRed));
-                return true;
-            } else if (code == 'm' && param.equals("31;1")) {
-                onEvent(new ForegroundColor(ansiRed));
-                onEvent(new Bold());
-                return true;
-            } else if (code == 'm' && param.equals("32")) {
-                onEvent(new ForegroundColor(ansiGreen));
-                return true;
-            } else if (code == 'm' && param.equals("32;1")) {
-                onEvent(new ForegroundColor(ansiGreen));
-                onEvent(new Bold());
-                return true;
-            } else if (code == 'm' && param.equals("33")) {
-                onEvent(new ForegroundColor(ansiYellow));
-                return true;
-            } else if (code == 'm' && param.equals("39")) {
-                onEvent(new ForegroundColor(null));
-                return true;
-            } else if (code == 'm' && param.equals("0;39")) {
-                onEvent(new Normal());
-                onEvent(new ForegroundColor(null));
-                return true;
-            } else if (code == 'D') {
-                onEvent(new CursorBack(Integer.parseInt(param)));
-                return true;
-            } else if (code == 'A') {
-                onEvent(new CursorUp(Integer.parseInt(param)));
-                return true;
-            } else if (code == 'B') {
-                onEvent(new CursorDown(Integer.parseInt(param)));
-                return true;
-            } else if (code == 'C') {
-                onEvent(new CursorForward(Integer.parseInt(param)));
-                return true;
-            } else if (code == 'K' && param.equals("0")) {
-                onEvent(new EraseToEndOfLine());
-                return true;
-            } else if (code == 'K' && param.equals("2")) {
-                onEvent(new EraseLine());
-                return true;
-            }
-            return false;
-        }
-    }
-
-    private static class Buffer {
-        private final byte[] buffer;
-        private int offset;
-        private int length;
-
-        public Buffer(byte[] buffer, int offset, int length) {
-            this.buffer = buffer;
-            this.offset = offset;
-            this.length = length;
-        }
-
-        public String consumeString() {
-            return new String(buffer, offset, length);
-        }
-
-        public byte peek() {
-            return buffer[offset];
-        }
-
-        public void consume() {
-            offset++;
-            length--;
-        }
-
-        public boolean hasMore() {
-            return length > 0;
-        }
-
-        public Buffer consumeToNext(byte value) {
-            int maxOffset = offset + length;
-            for (int nextValue = offset; nextValue < maxOffset; nextValue++) {
-                if (buffer[nextValue] == value) {
-                    int count = nextValue - offset;
-                    Buffer result = new Buffer(buffer, offset, count);
-                    offset = nextValue;
-                    length -= count;
-                    return result;
-                }
-            }
-            return null;
         }
     }
 }

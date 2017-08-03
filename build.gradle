@@ -3,18 +3,19 @@ apply plugin: 'idea'
 apply plugin: 'eclipse'
 apply plugin: 'application'
 
-def toolingApiVersion='latest.integration'
-//def toolingApiVersion='2.3'
+//def toolingApiVersion='latest.integration'
+def toolingApiVersion='4.0'
 
 repositories {
     //maven { url '../../gradle/build/repo' }
     //maven { url '../gradle-release/build/repo' }
     maven { url 'https://repo.gradle.org/gradle/repo' }
-    mavenCentral()
+    jcenter()
 }
 
 dependencies {
     compile "org.gradle:gradle-tooling-api:${toolingApiVersion}"
+    compile "net.rubygrapefruit:ansi-control-sequence-util:0.1"
     runtime 'org.slf4j:slf4j-simple:1.7.7'
 }
 
