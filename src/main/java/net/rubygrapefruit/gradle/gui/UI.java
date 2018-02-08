@@ -15,6 +15,7 @@ import org.gradle.tooling.model.build.BuildEnvironment;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.gradle.tooling.model.gradle.BuildInvocations;
 import org.gradle.tooling.model.gradle.GradleBuild;
+import org.gradle.tooling.model.gradle.ProjectPublications;
 import org.gradle.tooling.model.idea.IdeaProject;
 import org.gradle.util.GradleVersion;
 
@@ -71,8 +72,9 @@ public class UI {
         VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModelOperation<>(BuildEnvironment.class), new BuildEnvironmentReport(), executer);
         VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModelOperation<>(EclipseProject.class), new EclipseModelReport(), executer);
         VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModelOperation<>(IdeaProject.class), new IdeaModelReport(), executer);
+        VisualizationPanel<ProjectPublications> publications = new VisualizationPanel<>(new FetchModelOperation<>(ProjectPublications.class), new PublicationsTable(), executer);
         VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionOperation(), new MultiModelReport(), executer);
-        panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject, multiModel);
+        panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject, publications, multiModel);
         buttons = new ArrayList<>();
         buttons.add(runBuild);
         for (VisualizationPanel<?> visualizationPanel : panels) {
