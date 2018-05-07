@@ -1,9 +1,6 @@
 package net.rubygrapefruit.gradle.gui;
 
-import net.rubygrapefruit.gradle.gui.actions.FetchModelOperation;
-import net.rubygrapefruit.gradle.gui.actions.MultiModel;
-import net.rubygrapefruit.gradle.gui.actions.RunBuildActionOperation;
-import net.rubygrapefruit.gradle.gui.actions.RunBuildOperation;
+import net.rubygrapefruit.gradle.gui.actions.*;
 import net.rubygrapefruit.gradle.gui.visualizations.*;
 import org.gradle.tooling.CancellationTokenSource;
 import org.gradle.tooling.GradleConnector;
@@ -67,14 +64,14 @@ public class UI {
         originalStdErr = System.err;
         runBuild = new JButton("Build");
         cancel = new JButton("Cancel");
-        VisualizationPanel<GradleBuild> projects = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new ProjectTree(), executer);
+        VisualizationPanel<GradleBuild> builds = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new ProjectTree(), executer);
         VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModelOperation<>(BuildInvocations.class), new TasksTable(), executer);
         VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModelOperation<>(BuildEnvironment.class), new BuildEnvironmentReport(), executer);
         VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModelOperation<>(EclipseProject.class), new EclipseModelReport(), executer);
         VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModelOperation<>(IdeaProject.class), new IdeaModelReport(), executer);
-        VisualizationPanel<ProjectPublications> publications = new VisualizationPanel<>(new FetchModelOperation<>(ProjectPublications.class), new PublicationsTable(), executer);
+        VisualizationPanel<List<ProjectPublications>> publications = new VisualizationPanel<>(new FetchModelPerProjectOperation<>(ProjectPublications.class), new PublicationsTable(), executer);
         VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionOperation(), new MultiModelReport(), executer);
-        panels = Arrays.asList(projects, tasks, buildEnvironment, eclipseProject, ideaProject, publications, multiModel);
+        panels = Arrays.asList(builds, tasks, buildEnvironment, eclipseProject, ideaProject, publications, multiModel);
         buttons = new ArrayList<>();
         buttons.add(runBuild);
         for (VisualizationPanel<?> visualizationPanel : panels) {
