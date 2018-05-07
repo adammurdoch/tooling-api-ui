@@ -1,5 +1,6 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
+import org.gradle.tooling.model.GradleModuleVersion;
 import org.gradle.tooling.model.idea.IdeaJavaLanguageSettings;
 import org.gradle.tooling.model.idea.IdeaModuleDependency;
 import org.gradle.tooling.model.idea.IdeaProject;
@@ -87,8 +88,14 @@ public class IdeaModelReport extends Report<IdeaProject> {
                             });
                         } else if (dependency instanceof IdeaSingleEntryLibraryDependency) {
                             IdeaSingleEntryLibraryDependency libraryDependency = (IdeaSingleEntryLibraryDependency) dependency;
-                            String coords = String.format("Library %s:%s:%s", libraryDependency.getGradleModuleVersion().getGroup(),
-                                    libraryDependency.getGradleModuleVersion().getName(), libraryDependency.getGradleModuleVersion().getVersion());
+                            GradleModuleVersion id = libraryDependency.getGradleModuleVersion();
+                            String coords;
+                            if (id != null) {
+                                coords = String.format("Library %s:%s:%s", id.getGroup(),
+                                        id.getName(), id.getVersion());
+                            } else {
+                                coords = "Library " + libraryDependency.getFile().getName();
+                            }
                             tree.struct(coords, libraryDependency, dep -> {
                                 tree.value("Scope", dep.getScope().getScope());
                                 tree.value("Exported", dep.getExported());

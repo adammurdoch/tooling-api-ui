@@ -1,5 +1,6 @@
 package net.rubygrapefruit.gradle.gui.visualizations;
 
+import org.gradle.tooling.model.GradleModuleVersion;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 
 import java.util.ArrayList;
@@ -46,9 +47,15 @@ public class EclipseModelReport extends Report<EclipseProject> {
                     });
                 });
                 tree.collection("Classpath", project.getClasspath(), entry -> {
-                    String coords = String.format("Library %s:%s:%s", entry.getGradleModuleVersion().getGroup(),
-                            entry.getGradleModuleVersion().getName(), entry.getGradleModuleVersion().getVersion());
-                    tree.struct(coords, entry, externalDependency -> {
+                    GradleModuleVersion id = entry.getGradleModuleVersion();
+                    String displayName;
+                    if (id != null) {
+                        displayName = String.format("Library %s:%s:%s", id.getGroup(),
+                                id.getName(), id.getVersion());
+                    } else {
+                        displayName = "Library " + entry.getFile().getName();
+                    }
+                    tree.struct(displayName, entry, externalDependency -> {
                         tree.value("Exported", externalDependency.isExported());
                         tree.value("File", externalDependency.getFile());
                     });
