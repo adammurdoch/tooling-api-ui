@@ -71,7 +71,8 @@ public class UI {
         VisualizationPanel<IdeaProject> ideaProject = new VisualizationPanel<>(new FetchModelOperation<>(IdeaProject.class), new IdeaModelReport(), executer);
         VisualizationPanel<List<ProjectPublications>> publications = new VisualizationPanel<>(new FetchModelPerProjectOperation<>(ProjectPublications.class), new PublicationsTable(), executer);
         VisualizationPanel<MultiModel> multiModel = new VisualizationPanel<>(new RunBuildActionOperation(), new MultiModelReport(), executer);
-        panels = Arrays.asList(builds, tasks, buildEnvironment, eclipseProject, ideaProject, publications, multiModel);
+        VisualizationPanel<String> emptyModel = new VisualizationPanel<>(new RunNoOpBuildActionOperation(), new EmptyModelReport(), executer);
+        panels = Arrays.asList(builds, tasks, buildEnvironment, eclipseProject, ideaProject, publications, multiModel, emptyModel);
         buttons = new ArrayList<>();
         buttons.add(runBuild);
         for (VisualizationPanel<?> visualizationPanel : panels) {
@@ -94,7 +95,7 @@ public class UI {
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
         tapiVersion = new JLabel(GradleVersion.current().getVersion());
-        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "3.4.1", "3.4", "3.3", "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
+        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "4.6", "3.4.1", "3.4", "3.3", "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
 
         properties = new Properties();
         workspaceFile = new File(new File(System.getProperty("user.home")), ".tapi-ui/workspace.properties");
