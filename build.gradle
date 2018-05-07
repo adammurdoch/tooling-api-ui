@@ -4,7 +4,7 @@ apply plugin: 'eclipse'
 apply plugin: 'application'
 
 //def toolingApiVersion='latest.integration'
-def toolingApiVersion='4.0'
+def toolingApiVersion='4.6'
 
 repositories {
     //maven { url '../../gradle/build/repo' }
