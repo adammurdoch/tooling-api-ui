@@ -19,20 +19,18 @@ import org.gradle.util.GradleVersion;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.io.*;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class UI {
 
-    public static final String DEFAULT_VERSION = "Default";
-    public static final String LOCAL_DISTRIBUTION = "Local distribution";
+    private static final String DEFAULT_VERSION = "Default";
+    private static final String LOCAL_DISTRIBUTION = "Local distribution";
+    private static final String PROJECT_DIR_PROP = "project.dir";
     private final JButton runBuild;
     private final List<VisualizationPanel<?>> panels;
     private final JButton cancel;
@@ -58,6 +56,8 @@ public class UI {
     private final OperationExecuter executer = new OperationExecuter();
     private final Executor executionPool = Executors.newCachedThreadPool();
     private final JLabel tapiVersion;
+    private final File workspaceFile;
+    private final Properties properties;
 
     public UI() {
         originalStdOut = System.out;
@@ -95,6 +95,22 @@ public class UI {
         shutdown = new JButton("Shutdown tooling API");
         tapiVersion = new JLabel(GradleVersion.current().getVersion());
         gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "3.4.1", "3.4", "3.3", "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
+
+        properties = new Properties();
+        workspaceFile = new File(new File(System.getProperty("user.home")), ".tapi-ui/workspace.properties");
+        if (workspaceFile.isFile()) {
+            try {
+                try (FileInputStream inStream = new FileInputStream(workspaceFile)) {
+                    properties.load(inStream);
+                }
+            } catch (IOException e) {
+                originalStdErr.println("Could not load workspace from " + workspaceFile);
+                e.printStackTrace(originalStdErr);
+            }
+        }
+        if (!properties.containsKey(PROJECT_DIR_PROP)) {
+            properties.setProperty(PROJECT_DIR_PROP, Paths.get(".").toAbsolutePath().normalize().toString());
+        }
     }
 
     public static void main(String[] args) {
@@ -107,7 +123,7 @@ public class UI {
 
         SettingsPanel settings = panel.getSettings();
         settings.addControl("Tooling API version", tapiVersion);
-        projectDirSelector.setFile(new File("/Users/adam/gradle/test-projects/tooling"));
+        projectDirSelector.setFile(new File(properties.getProperty(PROJECT_DIR_PROP)));
         settings.addControl("Project directory", projectDirSelector);
         settings.addControl("Gradle version", gradleVersion);
         installation.setFile(new File("/Users/adam/gradle/current"));
@@ -137,6 +153,21 @@ public class UI {
         frame.setSize(1000, 800);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        Runtime.getRuntime().addShutdownHook(new Thread(){
+            @Override
+            public void run() {
+                properties.setProperty(PROJECT_DIR_PROP, projectDirSelector.getFile().getAbsolutePath());
+                workspaceFile.getParentFile().mkdirs();
+                try {
+                    try (OutputStream outputStream = new FileOutputStream(workspaceFile)) {
+                        properties.store(outputStream, "workspace");
+                    }
+                } catch (IOException e) {
+                    originalStdErr.println("Could not write workspace properties to " + workspaceFile);
+                    e.printStackTrace(originalStdErr);
+                }
+            }
+        });
     }
 
     private void onStartOperation(String displayName) {
