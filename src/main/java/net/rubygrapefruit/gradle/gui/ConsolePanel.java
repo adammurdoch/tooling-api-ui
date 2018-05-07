@@ -185,7 +185,7 @@ public class ConsolePanel extends JPanel {
                 if (event instanceof EraseInLine) {
                     try {
                         Element para = document.getParagraphElement(cursorPos);
-                        document.remove(para.getStartOffset(), para.getElementCount());
+                        document.remove(para.getStartOffset(), para.getElementCount() - 1);
                         cursorPos = para.getStartOffset();
                     } catch (BadLocationException e) {
                         throw new RuntimeException(e);
