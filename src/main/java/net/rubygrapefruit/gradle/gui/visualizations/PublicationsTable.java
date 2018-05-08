@@ -17,7 +17,7 @@ public class PublicationsTable implements Visualization<List<ProjectPublications
 
     @Override
     public String getDisplayName() {
-        return "Publications";
+        return "Publication model";
     }
 
     @Override

@@ -11,7 +11,7 @@ public class ProjectTree implements Visualization<GradleBuild> {
 
     @Override
     public String getDisplayName() {
-        return "Builds";
+        return "Project model";
     }
 
     @Override

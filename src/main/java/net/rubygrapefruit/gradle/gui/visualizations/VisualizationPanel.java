@@ -11,7 +11,9 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 
 public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
+    private final ToolingOperation<? extends T> operation;
     private final Visualization<? super T> visualization;
+    private final ToolingOperationExecuter executer;
     private final JButton button;
     private final JLayeredPane main;
     private final JLabel overlay;
@@ -20,7 +22,9 @@ public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
 
     public VisualizationPanel(ToolingOperation<? extends T> operation, Visualization<? super T> visualization,
                               ToolingOperationExecuter executer) {
+        this.operation = operation;
         this.visualization = visualization;
+        this.executer = executer;
         this.main = new JLayeredPane();
 
         JComponent mainComponent = visualization.getMainComponent();
@@ -41,7 +45,7 @@ public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
             }
         });
         button = new JButton(visualization.getDisplayName());
-        button.addActionListener(e -> executer.start(operation, this));
+        button.addActionListener(e -> start());
         main.add(button, JLayeredPane.DEFAULT_LAYER);
     }
 
@@ -54,6 +58,10 @@ public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
         overlayPanel.setSize(overlayPanel.getPreferredSize());
         overlayPanel.setLocation((main.getWidth() - overlayPanel.getWidth()) / 2,
                 (main.getHeight() - overlayPanel.getHeight()) / 4);
+    }
+
+    public void start() {
+        executer.start(operation, this);
     }
 
     @Override

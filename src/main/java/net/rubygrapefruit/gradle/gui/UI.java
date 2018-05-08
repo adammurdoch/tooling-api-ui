@@ -58,12 +58,16 @@ public class UI {
     private final JLabel tapiVersion;
     private final File workspaceFile;
     private final Properties properties;
+    private final BuildInvocation runBuildInvocation;
+    private JComboBox selectedInvocation;
+    private final List<BuildInvocation> invocations;
 
     public UI() {
         originalStdOut = System.out;
         originalStdErr = System.err;
-        runBuild = new JButton("Build");
+        runBuild = new JButton("Run");
         cancel = new JButton("Cancel");
+        selectedInvocation = new JComboBox();
         VisualizationPanel<GradleBuild> builds = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new ProjectTree(), executer);
         VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModelOperation<>(BuildInvocations.class), new TasksTable(), executer);
         VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModelOperation<>(BuildEnvironment.class), new BuildEnvironmentReport(), executer);
@@ -96,6 +100,13 @@ public class UI {
         shutdown = new JButton("Shutdown tooling API");
         tapiVersion = new JLabel(GradleVersion.current().getVersion());
         gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "4.6", "3.4.1", "3.4", "3.3", "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
+
+        invocations = new ArrayList<>();
+        runBuildInvocation = new RunBuildInvocation();
+        invocations.add(runBuildInvocation);
+        for (VisualizationPanel<?> visualizationPanel : panels) {
+            invocations.add(new VisualizationInvocation(visualizationPanel));
+        }
 
         properties = new Properties();
         workspaceFile = new File(new File(System.getProperty("user.home")), ".tapi-ui/workspace.properties");
@@ -142,33 +153,29 @@ public class UI {
         panel.addTab("Tests", testsView);
 
         panel.addToolbarControl("Command-line arguments", commandLineArgs);
-        commandLineArgs.addActionListener(new BuildAction<>(new RunBuildOperation()));
+        commandLineArgs.addActionListener(runBuildInvocation.getActionListener());
+        selectedInvocation.setModel(new DefaultComboBoxModel(invocations.toArray()));
+        panel.addToolbarControl(selectedInvocation);
         panel.addToolbarControl(runBuild);
-        runBuild.addActionListener(new BuildAction<>(new RunBuildOperation()));
+        runBuild.addActionListener(new StartSelectedInvocation());
         panel.addToolbarControl(cancel);
         cancel.addActionListener(new CancelListener());
-        for (VisualizationPanel visualizationPanel : panels) {
-            panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
-        }
         initButtons();
         frame.setSize(1000, 800);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        Runtime.getRuntime().addShutdownHook(new Thread(){
-            @Override
-            public void run() {
-                properties.setProperty(PROJECT_DIR_PROP, projectDirSelector.getFile().getAbsolutePath());
-                workspaceFile.getParentFile().mkdirs();
-                try {
-                    try (OutputStream outputStream = new FileOutputStream(workspaceFile)) {
-                        properties.store(outputStream, "workspace");
-                    }
-                } catch (IOException e) {
-                    originalStdErr.println("Could not write workspace properties to " + workspaceFile);
-                    e.printStackTrace(originalStdErr);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            properties.setProperty(PROJECT_DIR_PROP, projectDirSelector.getFile().getAbsolutePath());
+            workspaceFile.getParentFile().mkdirs();
+            try {
+                try (OutputStream outputStream = new FileOutputStream(workspaceFile)) {
+                    properties.store(outputStream, "workspace");
                 }
+            } catch (IOException e) {
+                originalStdErr.println("Could not write workspace properties to " + workspaceFile);
+                e.printStackTrace(originalStdErr);
             }
-        });
+        }));
     }
 
     private void onStartOperation(String displayName) {
@@ -204,15 +211,26 @@ public class UI {
         cancel.setEnabled(false);
     }
 
-    private class BuildAction<T> implements ActionListener {
-        private final ToolingOperation<? extends T> operation;
+    private class VisualizationInvocation extends BuildInvocation {
+        private final VisualizationPanel<?> visualizationPanel;
+        private boolean added;
 
-        protected BuildAction(ToolingOperation<T> operation) {
-            this.operation = operation;
+        VisualizationInvocation(VisualizationPanel<?> visualizationPanel) {
+            this.visualizationPanel = visualizationPanel;
         }
 
-        public void actionPerformed(ActionEvent actionEvent) {
-            executer.start(operation);
+        @Override
+        public String getDisplayName() {
+            return visualizationPanel.getDisplayName();
+        }
+
+        @Override
+        public void start() {
+            if (!added) {
+                panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
+                added = true;
+            }
+            visualizationPanel.start();
         }
     }
 
@@ -381,6 +399,25 @@ public class UI {
             // TODO - do this in the background
             System.out.println("Shutdown...");
             DefaultGradleConnector.close();
+        }
+    }
+
+    private class RunBuildInvocation extends BuildInvocation {
+        @Override
+        public String getDisplayName() {
+            return "Run tasks";
+        }
+
+        @Override
+        public void start() {
+            executer.start(new RunBuildOperation());
+        }
+    }
+
+    private class StartSelectedInvocation implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            ((BuildInvocation) selectedInvocation.getModel().getSelectedItem()).start();
         }
     }
 }

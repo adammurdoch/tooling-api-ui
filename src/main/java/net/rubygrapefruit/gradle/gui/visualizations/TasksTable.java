@@ -16,7 +16,7 @@ public class TasksTable implements Visualization<BuildInvocations> {
 
     @Override
     public String getDisplayName() {
-        return "Tasks";
+        return "Task model";
     }
 
     @Override

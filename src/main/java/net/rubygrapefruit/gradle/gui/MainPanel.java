@@ -48,8 +48,8 @@ public class MainPanel extends JPanel {
         insertIndex++;
     }
 
-    public void addToolbarControl(AbstractButton button) {
-        toolbar.add(button);
+    public void addToolbarControl(JComponent component) {
+        toolbar.add(component);
     }
 
     public void addToolbarControl(String title, JComponent component) {
