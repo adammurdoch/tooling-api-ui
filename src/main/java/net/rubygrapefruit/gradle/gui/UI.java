@@ -227,7 +227,8 @@ public class UI {
         @Override
         public void start() {
             if (!added) {
-                panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
+                MainPanel.Tab tab = panel.addTab(visualizationPanel.getDisplayName(), visualizationPanel.getMainComponent());
+                tab.show();
                 added = true;
             }
             visualizationPanel.start();

@@ -42,10 +42,10 @@ public class MainPanel extends JPanel {
         add(progress, BorderLayout.SOUTH);
     }
 
-    public void addTab(String title, JComponent component) {
+    public Tab addTab(String title, JComponent component) {
         tabs.insertTab(title, null, component, title, insertIndex);
         tabTitles.put(title, insertIndex);
-        insertIndex++;
+        return new Tab(insertIndex++);
     }
 
     public void addToolbarControl(JComponent component) {
@@ -81,6 +81,18 @@ public class MainPanel extends JPanel {
         }
         else {
             SwingUtilities.invokeLater(() -> progress.setText(text));
+        }
+    }
+
+    public class Tab {
+        private final int i;
+
+        Tab(int i) {
+            this.i = i;
+        }
+
+        public void show() {
+            tabs.setSelectedIndex(i);
         }
     }
 }
