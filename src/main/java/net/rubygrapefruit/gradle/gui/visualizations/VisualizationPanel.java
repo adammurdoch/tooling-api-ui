@@ -44,7 +44,8 @@ public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
                 resizeOverlay();
             }
         });
-        button = new JButton(visualization.getDisplayName());
+        button = new JButton("Refresh");
+        button.setEnabled(false);
         button.addActionListener(e -> start());
         main.add(button, JLayeredPane.DEFAULT_LAYER);
     }
@@ -79,7 +80,6 @@ public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
 
     @Override
     public void update(T model) {
-        button.setText("Refresh");
         try {
             visualization.update(model);
         } catch (RuntimeException e) {
@@ -96,7 +96,7 @@ public class VisualizationPanel<T> implements ProgressAwareVisualization<T> {
         overlay.setText("Failed");
     }
 
-    public JButton getLaunchButton() {
+    public JButton getRefreshButton() {
         return button;
     }
 

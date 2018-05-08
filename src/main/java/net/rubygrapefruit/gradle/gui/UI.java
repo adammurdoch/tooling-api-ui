@@ -80,7 +80,7 @@ public class UI {
         buttons = new ArrayList<>();
         buttons.add(runBuild);
         for (VisualizationPanel<?> visualizationPanel : panels) {
-            buttons.add(visualizationPanel.getLaunchButton());
+            buttons.add(visualizationPanel.getRefreshButton());
         }
         panel = new MainPanel();
         console = panel.getConsole();
