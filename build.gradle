@@ -4,11 +4,9 @@ apply plugin: 'eclipse'
 apply plugin: 'application'
 
 //def toolingApiVersion='latest.integration'
-def toolingApiVersion='5.4.1'
+def toolingApiVersion='6.8'
 
 repositories {
-    //maven { url '../../gradle/build/repo' }
-    //maven { url '../gradle-release/build/repo' }
     maven { url 'https://repo.gradle.org/gradle/repo' }
     jcenter()
 }

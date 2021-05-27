@@ -61,15 +61,7 @@ public class IdeaModelReport extends Report<IdeaProject> {
                             tree.value("Directory", sourceDir.getDirectory());
                             tree.value("Generated", sourceDir.isGenerated());
                         });
-                        tree.collection("Generated Source directories", contentRoot.getGeneratedSourceDirectories(), sourceDir -> {
-                            tree.value("Directory", sourceDir.getDirectory());
-                            tree.value("Generated", sourceDir.isGenerated());
-                        });
                         tree.collection("Test Source directories", contentRoot.getTestDirectories(), sourceDir -> {
-                            tree.value("Directory", sourceDir.getDirectory());
-                            tree.value("Generated", sourceDir.isGenerated());
-                        });
-                        tree.collection("Generated test Source directories", contentRoot.getGeneratedTestDirectories(), sourceDir -> {
                             tree.value("Directory", sourceDir.getDirectory());
                             tree.value("Generated", sourceDir.isGenerated());
                         });
