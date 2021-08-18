@@ -4,17 +4,17 @@ apply plugin: 'eclipse'
 apply plugin: 'application'
 
 //def toolingApiVersion='latest.integration'
-def toolingApiVersion='6.8'
+def toolingApiVersion='7.2'
 
 repositories {
     maven { url 'https://repo.gradle.org/gradle/repo' }
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
-    compile "org.gradle:gradle-tooling-api:${toolingApiVersion}"
-    compile "net.rubygrapefruit:ansi-control-sequence-util:0.1"
-    runtime 'org.slf4j:slf4j-simple:1.7.7'
+    implementation "org.gradle:gradle-tooling-api:${toolingApiVersion}"
+    implementation "net.rubygrapefruit:ansi-control-sequence-util:0.3"
+    runtimeOnly 'org.slf4j:slf4j-simple:1.7.7'
 }
 
 mainClassName = 'net.rubygrapefruit.gradle.gui.UI'
