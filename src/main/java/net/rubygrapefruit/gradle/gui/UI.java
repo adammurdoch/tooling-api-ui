@@ -20,6 +20,8 @@ import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executor;
@@ -31,6 +33,7 @@ public class UI {
     private static final String DEFAULT_VERSION = "Default";
     private static final String LOCAL_DISTRIBUTION = "Local distribution";
     private static final String PROJECT_DIR_PROP = "project.dir";
+    private static final String JVM_ARGS_PROP = "jvm.args";
     private final JButton runBuild;
     private final List<VisualizationPanel<?>> panels;
     private final JButton cancel;
@@ -59,7 +62,7 @@ public class UI {
     private final File workspaceFile;
     private final Properties properties;
     private final BuildInvocation runBuildInvocation;
-    private JComboBox selectedInvocation;
+    private final JComboBox<BuildInvocation> selectedInvocation;
     private final List<BuildInvocation> invocations;
 
     public UI() {
@@ -67,8 +70,8 @@ public class UI {
         originalStdErr = System.err;
         runBuild = new JButton("Run");
         cancel = new JButton("Cancel");
-        selectedInvocation = new JComboBox();
-        VisualizationPanel<GradleBuild> builds = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new ProjectTree(), executer);
+        selectedInvocation = new JComboBox<>();
+        VisualizationPanel<GradleBuild> builds = new VisualizationPanel<>(new FetchModelOperation<>(GradleBuild.class), new BuildTree(), executer);
         VisualizationPanel<BuildInvocations> tasks = new VisualizationPanel<>(new FetchModelOperation<>(BuildInvocations.class), new TasksTable(), executer);
         VisualizationPanel<BuildEnvironment> buildEnvironment = new VisualizationPanel<>(new FetchModelOperation<>(BuildEnvironment.class), new BuildEnvironmentReport(), executer);
         VisualizationPanel<EclipseProject> eclipseProject = new VisualizationPanel<>(new FetchModelOperation<>(EclipseProject.class), new EclipseModelReport(), executer);
@@ -99,7 +102,7 @@ public class UI {
         verboseLogging = new JCheckBox("Verbose logging (internal)");
         shutdown = new JButton("Shutdown tooling API");
         tapiVersion = new JLabel(GradleVersion.current().getVersion());
-        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "4.6", "3.4.1", "3.4", "3.3", "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
+        gradleVersion = new JComboBox<>(new Object[]{LOCAL_DISTRIBUTION, DEFAULT_VERSION, "7.2", "4.6", "3.4.1", "3.4", "3.3", "3.2", "3.1", "3.0", "2.14.1", "2.13", "2.12", "2.11", "2.10", "2.9", "2.8", "2.7", "2.6", "2.5", "2.4", "2.3", "2.2.1", "2.2", "2.1", "2.0", "1.12", "1.11", "1.0", "1.0-milestone-8", "1.0-milestone-3", "0.9.2", "0.8"});
 
         invocations = new ArrayList<>();
         runBuildInvocation = new RunBuildInvocation();
@@ -123,6 +126,9 @@ public class UI {
         if (!properties.containsKey(PROJECT_DIR_PROP)) {
             properties.setProperty(PROJECT_DIR_PROP, Paths.get(".").toAbsolutePath().normalize().toString());
         }
+        if (!properties.containsKey(JVM_ARGS_PROP)) {
+            properties.setProperty(JVM_ARGS_PROP, "");
+        }
     }
 
     public static void main(String[] args) {
@@ -141,6 +147,7 @@ public class UI {
         installation.setFile(new File("/Users/adam/gradle/current"));
         settings.addControl("Distribution", installation);
         settings.addControl("JVM args", jvmArgs);
+        jvmArgs.setText(properties.getProperty(JVM_ARGS_PROP));
         settings.addControl("User home directory", userHomeDir);
         color.setSelected(true);
         settings.addControl(color);
@@ -166,6 +173,7 @@ public class UI {
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             properties.setProperty(PROJECT_DIR_PROP, projectDirSelector.getFile().getAbsolutePath());
+            properties.setProperty(JVM_ARGS_PROP, jvmArgs.getText());
             workspaceFile.getParentFile().mkdirs();
             try {
                 try (OutputStream outputStream = new FileOutputStream(workspaceFile)) {
@@ -198,7 +206,14 @@ public class UI {
         console.getError().flush();
         log.getOutput().flush();
         log.getError().flush();
-        panel.onProgress((failure == null ? "Finished" : "Failed") + " (" + timeMillis / 1000 + " seconds)");
+        String formattedTime;
+        if (timeMillis < 1000) {
+            formattedTime = timeMillis + "ms";
+        } else {
+            BigDecimal seconds = BigDecimal.valueOf(timeMillis).divide(BigDecimal.valueOf(1000), RoundingMode.DOWN);
+            formattedTime = seconds + " seconds" + " (" + timeMillis + "ms)";
+        }
+        panel.onProgress((failure == null ? "Finished" : "Failed") + " (" + formattedTime + ")");
         commandLineArgs.requestFocusInWindow();
         commandLineArgs.selectAll();
         initButtons();
@@ -374,9 +389,9 @@ public class UI {
                     });
                 }
             });
-    }
+        }
 
-    private String[] args(String source) {
+        private String[] args(String source) {
             String trimmed = source.trim();
             if (trimmed.isEmpty()) {
                 return new String[0];

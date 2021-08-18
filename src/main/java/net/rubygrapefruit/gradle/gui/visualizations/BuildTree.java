@@ -3,9 +3,9 @@ package net.rubygrapefruit.gradle.gui.visualizations;
 import org.gradle.tooling.model.gradle.BasicGradleProject;
 import org.gradle.tooling.model.gradle.GradleBuild;
 
-public class ProjectTree extends Report<GradleBuild> {
-    public ProjectTree() {
-        super("Project model");
+public class BuildTree extends Report<GradleBuild> {
+    public BuildTree() {
+        super("Build model");
     }
 
     @Override
